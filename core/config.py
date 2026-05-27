@@ -10,6 +10,12 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 import platform
 import multiprocessing
 import torch
+
+# Optimasi CUDA Tensor Cores & CUDNN
+if torch.cuda.is_available():
+    torch.backends.cuda.matmul.allow_tf32 = True
+    torch.backends.cudnn.allow_tf32 = True
+    torch.backends.cudnn.benchmark = True
 from dataclasses import dataclass, field
 
 # Optimasi CPU Threads
@@ -46,6 +52,15 @@ def get_available_ram_gb() -> float:
     except Exception:
         pass
     return 2.0
+
+def get_gpu_vram_gb() -> float:
+    """Deteksi total memori VRAM GPU dalam GB."""
+    if torch.cuda.is_available():
+        try:
+            return torch.cuda.get_device_properties(0).total_memory / (1024 ** 3)
+        except Exception:
+            pass
+    return 0.0
 
 # ============================================================================
 # Profil Model — dari SMALL hingga ULTRA
@@ -241,6 +256,25 @@ def get_config(auto_detect: bool = True, size_override: str = None):
             training_cfg.use_bfloat16_cpu = False
             print(f"      Batch Size disesuaikan: {old_batch} → {training_cfg.batch_size}")
             print(f"      Gradient Accumulation Steps: {training_cfg.gradient_accumulation_steps}")
+        else:
+            # GPU VRAM Optimization
+            vram = get_gpu_vram_gb()
+            if vram > 0:
+                if vram >= 75.0:
+                    multiplier = 8
+                elif vram >= 38.0:
+                    multiplier = 4
+                elif vram >= 20.0:
+                    multiplier = 2
+                else:
+                    multiplier = 1
+                
+                if multiplier > 1:
+                    old_batch = training_cfg.batch_size
+                    training_cfg.batch_size = old_batch * multiplier
+                    old_accum = training_cfg.gradient_accumulation_steps
+                    training_cfg.gradient_accumulation_steps = max(1, old_accum // multiplier)
+                    print(f"   ⚡ GPU VRAM Terdeteksi: {vram:.1f} GB. Menaikkan Batch Size: {old_batch} → {training_cfg.batch_size} (Accumulation: {old_accum} → {training_cfg.gradient_accumulation_steps})")
         
         # Tentukan optimizer_type otomatis
         total_ram = get_system_ram_gb()

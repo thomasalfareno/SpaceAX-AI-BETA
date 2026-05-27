@@ -90,15 +90,16 @@ class Attention(nn.Module):
         xk = xk.transpose(1, 2)
         xv = xv.transpose(1, 2)
 
-        scores = torch.matmul(xq, xk.transpose(2, 3)) / math.sqrt(self.head_dim)
+        # Gunakan scaled_dot_product_attention (FlashAttention)
+        # Sangat cepat di GPU Tesla T4 (FP16) dan menghemat VRAM secara drastis
+        dropout_p = self.dropout.p if self.training else 0.0
+        output = F.scaled_dot_product_attention(
+            xq, xk, xv,
+            attn_mask=mask,
+            dropout_p=dropout_p,
+            is_causal=False
+        )
 
-        if mask is not None:
-            scores = scores + mask
-
-        scores = F.softmax(scores.float(), dim=-1).type_as(xq)
-        scores = self.dropout(scores)
-
-        output = torch.matmul(scores, xv)
         output = output.transpose(1, 2).contiguous().view(bsz, seqlen, -1)
 
         return self.wo(output), new_kv_cache

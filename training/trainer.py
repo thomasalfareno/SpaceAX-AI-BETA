@@ -219,8 +219,15 @@ class Trainer:
 
         # Mixed precision (GPU only)
         self.use_amp = config.fp16 and self.device.type == "cuda"
+        self.amp_dtype = torch.float16
+        if self.use_amp:
+            # Gunakan bfloat16 jika disupport oleh GPU secara native (lebih stabil & cepat)
+            if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
+                self.amp_dtype = torch.bfloat16
+                print("   ⚡ Trainer: GPU mendukung bfloat16 secara native. Mengaktifkan bfloat16 mixed precision.")
+        
         self.scaler = (
-            torch.amp.GradScaler("cuda", enabled=self.use_amp)
+            torch.amp.GradScaler("cuda", enabled=self.use_amp and self.amp_dtype == torch.float16)
             if self.use_amp
             else None
         )
@@ -299,13 +306,16 @@ class Trainer:
 
             # Forward pass
             if self.use_amp:
-                with torch.amp.autocast("cuda"):
+                with torch.amp.autocast("cuda", dtype=self.amp_dtype):
                     logits, _ = self.model(inputs)
                     loss = self.criterion(
                         logits.view(-1, logits.size(-1)), targets.view(-1)
                     )
                     loss = loss / grad_accum_steps
-                self.scaler.scale(loss).backward()
+                if self.scaler is not None:
+                    self.scaler.scale(loss).backward()
+                else:
+                    loss.backward()
             elif use_bfloat16:
                 with torch.amp.autocast("cpu", dtype=torch.bfloat16):
                     logits, _ = self.model(inputs)
@@ -327,7 +337,7 @@ class Trainer:
                 batch_idx + 1
             ) == len(self.train_loader):
                 step_skipped = False
-                if self.use_amp:
+                if self.use_amp and self.scaler is not None:
                     self.scaler.unscale_(self.optimizer)
                     torch.nn.utils.clip_grad_norm_(
                         self.model.parameters(), self.config.grad_clip
