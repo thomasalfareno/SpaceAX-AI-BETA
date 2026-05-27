@@ -366,6 +366,8 @@ class TerminalChat:
         if not self.tokenizer.load(self.paths.vocab_dir):
             self.console.print("[yellow]   Tokenizer belum dilatih → mode fallback.[/]")
             self.tokenizer = None
+        else:
+            self.config["model"].vocab_size = self.tokenizer.vocab_size
 
     def _init_model(self):
         self.device = torch.device("cpu")
@@ -1138,7 +1140,8 @@ class TerminalChat:
                     )
                 raw = self.tokenizer.decode(output_ids)
                 for sp in self.tokenizer.special_tokens:
-                    raw = raw.replace(sp, "")
+                    if sp not in ["<pikir>", "</pikir>"]:
+                        raw = raw.replace(sp, "")
                 raw = raw.strip()
                 if is_valid_output(raw) and len(raw) > 10:
                     if "<pikir>" in raw:

@@ -33,6 +33,8 @@ class BPETokenizer:
             "<EMO_TRUST>": 11,
             "<EMO_ANTICIPATION>": 12,
             "<EMO_NEUTRAL>": 13,
+            "<pikir>": 14,
+            "</pikir>": 15,
         }
 
         # Susun list terurut agar BpeTrainer menetapkan ID yang benar
@@ -41,6 +43,7 @@ class BPETokenizer:
             "<EMO_JOY>", "<EMO_SAD>", "<EMO_ANGER>", "<EMO_FEAR>",
             "<EMO_SURPRISE>", "<EMO_DISGUST>", "<EMO_TRUST>",
             "<EMO_ANTICIPATION>", "<EMO_NEUTRAL>",
+            "<pikir>", "</pikir>",
         ]
 
         self._build_fresh_tokenizer()
@@ -120,3 +123,7 @@ class BPETokenizer:
         except Exception as e:
             print(f"⚠️ Gagal memuat tokenizer: {e}")
             return False
+
+    @property
+    def vocab_size(self) -> int:
+        return self.tokenizer.get_vocab_size()

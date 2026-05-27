@@ -5,6 +5,8 @@ Oleh: Thomas Alfareno Ananta Nugraha - ITS Surabaya
 """
 
 import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 import platform
 import multiprocessing
 import torch
@@ -130,6 +132,7 @@ def auto_model_config(size_override: str = None):
         d_ff=profile["d_ff"],
         max_seq_len=profile["max_seq_len"],
         vocab_size=profile["vocab_size"],
+        use_gradient_checkpointing=profile_name in ["ultra", "promax"],
     )
     batch = profile["batch_size"]
     label = profile["label"]
@@ -153,6 +156,7 @@ class ModelConfig:
     vocab_size: int = 64000
     dropout: float = 0.1
     rope_theta: float = 10000.0
+    use_gradient_checkpointing: bool = False
 
 @dataclass
 class TrainingConfig:
@@ -168,6 +172,7 @@ class TrainingConfig:
     fp16: bool = True  # Aktifkan mixed precision di GPU
     use_bfloat16_cpu: bool = False
     num_workers: int = 0
+    optimizer_type: str = "adamw"  # "adamw" atau "adafactor"
     # Early stopping
     early_stopping_patience: int = 5  # Lebih sabar sebelum berhenti
 
@@ -236,6 +241,15 @@ def get_config(auto_detect: bool = True, size_override: str = None):
             training_cfg.use_bfloat16_cpu = False
             print(f"      Batch Size disesuaikan: {old_batch} → {training_cfg.batch_size}")
             print(f"      Gradient Accumulation Steps: {training_cfg.gradient_accumulation_steps}")
+        
+        # Tentukan optimizer_type otomatis
+        total_ram = get_system_ram_gb()
+        is_large_model = size_override in ["ultra", "promax"] or (size_override is None and total_ram >= 32.0)
+        if is_large_model or total_ram < 16.0:
+            training_cfg.optimizer_type = "adafactor"
+            print(f"   ⚙️  RAM Manajemen: Mengaktifkan optimizer low-memory 'adafactor' (menghemat ~9.6GB RAM).")
+        else:
+            training_cfg.optimizer_type = "adamw"
     else:
         model_cfg = ModelConfig()
         training_cfg = TrainingConfig()

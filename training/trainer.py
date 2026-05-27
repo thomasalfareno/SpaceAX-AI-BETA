@@ -49,6 +49,117 @@ class _WarmupCosineScheduler(torch.optim.lr_scheduler.LRScheduler):
         return [base_lr * scale for base_lr in self.base_lrs]
 
 
+class Adafactor(torch.optim.Optimizer):
+    """Custom pure-PyTorch implementation of the Adafactor optimizer.
+    Dioptimalkan untuk melatih model Transformer berukuran besar dengan memory overhead seminimal mungkin.
+    """
+    def __init__(self, params, lr=1e-3, eps1=1e-30, eps2=1e-3, clip_threshold=1.0,
+                 beta1=None, beta2_decay=0.999, weight_decay=0.0):
+        if lr is not None and lr < 0.0:
+            raise ValueError(f"Invalid learning rate: {lr}")
+        defaults = dict(lr=lr, eps1=eps1, eps2=eps2, clip_threshold=clip_threshold,
+                        beta1=beta1, beta2_decay=beta2_decay, weight_decay=weight_decay)
+        super().__init__(params, defaults)
+
+    @torch.no_grad()
+    def step(self, closure=None):
+        loss = None
+        if closure is not None:
+            with torch.enable_grad():
+                loss = closure()
+
+        for group in self.param_groups:
+            lr = group['lr']
+            eps1 = group['eps1']
+            eps2 = group['eps2']
+            clip_threshold = group['clip_threshold']
+            beta1 = group['beta1']
+            beta2_decay = group['beta2_decay']
+            weight_decay = group['weight_decay']
+
+            for p in group['params']:
+                if p.grad is None:
+                    continue
+                grad = p.grad
+                if grad.is_sparse:
+                    raise RuntimeError("Adafactor does not support sparse gradients")
+
+                state = self.state[p]
+
+                # Inisialisasi state
+                if len(state) == 0:
+                    state['step'] = 0
+                    if beta1 is not None:
+                        state['exp_avg'] = torch.zeros_like(p)
+                    
+                    # Cek dimensi parameter untuk memfaktorkan
+                    shape = p.shape
+                    if len(shape) >= 2:
+                        # Faktorkan second moment matrix
+                        state['exp_avg_sq_row'] = torch.zeros(shape[:-1] + (1,), dtype=p.dtype, device=p.device)
+                        state['exp_avg_sq_col'] = torch.zeros((1,) * (len(shape) - 1) + shape[-1:], dtype=p.dtype, device=p.device)
+                    else:
+                        # Gunakan second moment penuh untuk 1D/0D parameter
+                        state['exp_avg_sq'] = torch.zeros_like(p)
+
+                state['step'] += 1
+                step = state['step']
+                beta2 = 1.0 - math.pow(step, -beta2_decay)
+
+                # Hitung RMS gradien kuadrat
+                grad_sq = grad.square().add_(eps1)
+
+                if len(p.shape) >= 2:
+                    # Parameter 2D ke atas: Factored update
+                    r_avg = state['exp_avg_sq_row']
+                    c_avg = state['exp_avg_sq_col']
+
+                    # Update row dan col averages
+                    row_mean = grad_sq.mean(dim=-1, keepdim=True)
+                    col_mean = grad_sq.mean(dim=-2, keepdim=True)
+
+                    r_avg.mul_(beta2).add_(row_mean, alpha=1.0 - beta2)
+                    c_avg.mul_(beta2).add_(col_mean, alpha=1.0 - beta2)
+
+                    # Estimasi second moment penuh dari faktor
+                    r_avg_mean = r_avg.mean(dim=-2, keepdim=True).add_(eps2)
+                    v = torch.matmul(r_avg, c_avg).div_(r_avg_mean)
+                else:
+                    # Parameter 1D/0D: Standard update
+                    v = state['exp_avg_sq']
+                    v.mul_(beta2).add_(grad_sq, alpha=1.0 - beta2)
+
+                # Scaling update step
+                # U = G / (sqrt(v) + eps2)
+                if len(p.shape) >= 2:
+                    v.sqrt_().add_(eps2)
+                    u = grad.div(v)
+                else:
+                    u = grad.div(v.sqrt().add_(eps2))
+
+                # Clip step jika RMS melebihi threshold
+                rms_u = u.square().mean().sqrt()
+                if rms_u > clip_threshold:
+                    u.mul_(clip_threshold / max(rms_u, 1e-12))
+
+                # Terapkan learning rate
+                u.mul_(lr)
+
+                # Terapkan momentum (jika diaktifkan)
+                if beta1 is not None:
+                    exp_avg = state['exp_avg']
+                    exp_avg.mul_(beta1).add_(u, alpha=1.0 - beta1)
+                    p.add_(exp_avg, alpha=-1.0)
+                else:
+                    p.add_(u, alpha=-1.0)
+
+                # Weight decay (jika ada)
+                if weight_decay != 0.0:
+                    p.mul_(1.0 - lr * weight_decay)
+
+        return loss
+
+
 class Trainer:
     """Trainer untuk SpaceaxModel.
 
@@ -75,11 +186,20 @@ class Trainer:
         self.model.to(self.device)
 
         # Optimizer
-        self.optimizer = AdamW(
-            self.model.parameters(),
-            lr=config.learning_rate,
-            weight_decay=config.weight_decay,
-        )
+        optimizer_type = getattr(config, "optimizer_type", "adamw")
+        if optimizer_type == "adafactor":
+            self.optimizer = Adafactor(
+                self.model.parameters(),
+                lr=config.learning_rate,
+                weight_decay=config.weight_decay,
+            )
+            print("   ⚙️  Trainer: Menggunakan optimizer low-memory 'Adafactor' kustom.")
+        else:
+            self.optimizer = AdamW(
+                self.model.parameters(),
+                lr=config.learning_rate,
+                weight_decay=config.weight_decay,
+            )
 
         # Scheduler: linear warmup + cosine decay
         grad_accum = getattr(config, "gradient_accumulation_steps", 1)
@@ -206,22 +326,27 @@ class Trainer:
             if (batch_idx + 1) % grad_accum_steps == 0 or (
                 batch_idx + 1
             ) == len(self.train_loader):
+                step_skipped = False
                 if self.use_amp:
                     self.scaler.unscale_(self.optimizer)
                     torch.nn.utils.clip_grad_norm_(
                         self.model.parameters(), self.config.grad_clip
                     )
+                    scale_before = self.scaler.get_scale()
                     self.scaler.step(self.optimizer)
                     self.scaler.update()
+                    scale_after = self.scaler.get_scale()
+                    step_skipped = scale_after < scale_before
                 else:
                     torch.nn.utils.clip_grad_norm_(
                         self.model.parameters(), self.config.grad_clip
                     )
                     self.optimizer.step()
 
-                self.scheduler.step()
+                if not step_skipped:
+                    self.scheduler.step()
+                    self.step += 1
                 self.optimizer.zero_grad(set_to_none=True)
-                self.step += 1
 
             # Logging
             loss_item = loss.item() * grad_accum_steps
@@ -245,8 +370,10 @@ class Trainer:
                     f"LR: {curr_lr:.2e} | {tokens_per_sec:.0f} tok/s | ETA: {eta_str}"
                 )
 
-            # Bersihkan memori secara berkala
-            if batch_idx % 200 == 0:
+            # Bersihkan memori secara berkala (sangat penting untuk RAM terbatas)
+            is_low_mem = getattr(self.config, "optimizer_type", "adamw") == "adafactor"
+            gc_interval = 250 if is_low_mem else 500
+            if batch_idx % gc_interval == 0:
                 gc.collect()
 
         avg_loss = total_loss / max(num_batches, 1)
@@ -256,6 +383,11 @@ class Trainer:
             f"  → Epoch {epoch} selesai: avg_loss={avg_loss:.4f}, "
             f"{tok_s:.0f} tok/s, {elapsed:.0f}s"
         )
+        
+        # Bersihkan cache CUDA di akhir epoch untuk optimalitas tokens/sec
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        gc.collect()
         return avg_loss
 
     # ------------------------------------------------------------------
@@ -315,9 +447,10 @@ class Trainer:
                     eos_id=eos_id,
                 )
                 response_text = self.tokenizer.decode(generated_ids)
-                # Bersihkan special token strings dari output
+                # Bersihkan special token strings dari output (kecuali tag pikir)
                 for st in self.tokenizer.special_tokens:
-                    response_text = response_text.replace(st, "")
+                    if st not in ["<pikir>", "</pikir>"]:
+                        response_text = response_text.replace(st, "")
                 response_text = response_text.strip()
                 # Batasi panjang tampilan
                 if len(response_text) > 150:

@@ -173,7 +173,7 @@ class SpaceaxModel(nn.Module):
         new_kv_caches = []
         for i, layer in enumerate(self.layers):
             cache = kv_caches[i] if kv_caches else None
-            if self.training and h.requires_grad:
+            if self.training and h.requires_grad and getattr(self.config, "use_gradient_checkpointing", False):
                 # Membantu mengurangi memory usage saat training (trade compute for memory)
                 def custom_forward(*inputs):
                     return layer(*inputs)

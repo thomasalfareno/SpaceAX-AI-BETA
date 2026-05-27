@@ -218,11 +218,14 @@ def create_dataloaders(
         )
 
     # Auto-detect num_workers
+    from core.config import get_system_ram_gb
+    total_ram = get_system_ram_gb()
+
     if num_workers is None:
-        if torch.cuda.is_available():
-            num_workers = min(4, multiprocessing.cpu_count() or 0)
+        if torch.cuda.is_available() and total_ram >= 16.0:
+            num_workers = min(2, multiprocessing.cpu_count() or 0)
         else:
-            num_workers = 0  # Pada CPU, overhead multiprocessing tidak worth it
+            num_workers = 0  # Force 0 workers on low RAM or CPU to prevent duplicating RAM in child processes
 
     use_pin_memory = torch.cuda.is_available()
 

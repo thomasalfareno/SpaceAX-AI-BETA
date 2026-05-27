@@ -117,6 +117,10 @@ def train_cmd(size_override=None, epochs_override=None, regen_data=False):
         tokenizer.save(config["paths"].vocab_dir)
         print("✅ Tokenizer selesai!")
 
+    # Sinkronisasi vocab_size config dengan tokenizer yang sebenarnya
+    config["model"].vocab_size = tokenizer.vocab_size
+    print(f"   📊 Vocab Size disesuaikan ke tokenizer: {config['model'].vocab_size:,}")
+
     # ====================================================================
     # 4. Model
     # ====================================================================
@@ -162,7 +166,7 @@ def train_cmd(size_override=None, epochs_override=None, regen_data=False):
             ckpt = torch.load(cp, map_location="cpu", weights_only=False)
             old_state = ckpt.get('model_state_dict', {})
             # Cek apakah arsitektur cocok (d_model harus sama)
-            embed_key = 'embedding.weight'
+            embed_key = 'tok_embeddings.weight'
             if embed_key in old_state:
                 old_d_model = old_state[embed_key].shape[1]
                 old_vocab = old_state[embed_key].shape[0]
