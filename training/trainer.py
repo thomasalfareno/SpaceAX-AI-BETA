@@ -221,10 +221,15 @@ class Trainer:
         self.use_amp = config.fp16 and self.device.type == "cuda"
         self.amp_dtype = torch.float16
         if self.use_amp:
-            # Gunakan bfloat16 jika disupport oleh GPU secara native (lebih stabil & cepat)
+            # Gunakan bfloat16 jika disupport oleh GPU secara native di level hardware (Compute Capability >= 8, seperti Ampere/A100)
             if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
-                self.amp_dtype = torch.bfloat16
-                print("   ⚡ Trainer: GPU mendukung bfloat16 secara native. Mengaktifkan bfloat16 mixed precision.")
+                try:
+                    major = torch.cuda.get_device_capability(0)[0]
+                    if major >= 8:
+                        self.amp_dtype = torch.bfloat16
+                        print("   ⚡ Trainer: GPU mendukung bfloat16 secara native di hardware. Mengaktifkan bfloat16 mixed precision.")
+                except Exception:
+                    pass
         
         self.scaler = (
             torch.amp.GradScaler("cuda", enabled=self.use_amp and self.amp_dtype == torch.float16)
