@@ -15,7 +15,7 @@ from tokenizers.pre_tokenizers import Whitespace
 
 class BPETokenizer:
     def __init__(self, vocab_size: int = 16000):
-        self.vocab_size = vocab_size
+        self.target_vocab_size = vocab_size
 
         # Special tokens — ID tetap, digunakan oleh EmotionEngine, Dataset, Trainer
         self.special_tokens = {
@@ -60,10 +60,10 @@ class BPETokenizer:
 
     def train(self, text: str):
         """Latih tokenizer BPE dengan teks korpus."""
-        print(f"⚡ Memulai BPE training (Rust backend)… target vocab_size: {self.vocab_size}")
+        print(f"⚡ Memulai BPE training (Rust backend)… target vocab_size: {self.target_vocab_size}")
 
         trainer = BpeTrainer(
-            vocab_size=self.vocab_size,
+            vocab_size=self.target_vocab_size,
             special_tokens=self.special_tokens_list,
             min_frequency=2,
             show_progress=True,
