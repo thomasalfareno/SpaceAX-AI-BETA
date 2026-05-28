@@ -294,15 +294,13 @@ class KBBIVocabulary:
         # Stress test: gunakan lebih banyak kata
         sampled_words = random.sample(words_with_defs, min(max_pairs, len(words_with_defs)))
 
-        # Variasi prefix pemikiran
         pikir_prefixes = [
             "Mencari makna kata '{word}'...",
-            "Mengingat definisi KBBI untuk '{word}'...",
+            "Mengingat definisi untuk '{word}'...",
             "Menganalisis kata '{word}'...",
             "Kata '{word}' memiliki arti...",
-            "Berdasarkan kamus, '{word}' berarti...",
+            "Menurut kamus, '{word}' berarti...",
             "Hmm, '{word}' itu...",
-            "Membuka database KBBI untuk '{word}'..."
         ]
 
         # Variasi gaya bahasa (formal, santai, analitik, singkat)
@@ -313,7 +311,7 @@ class KBBIVocabulary:
             arti_utama = defs[0]
             
             if style == "formal":
-                ans = f"Menurut Kamus Besar Bahasa Indonesia (KBBI), kata '{word}' didefinisikan sebagai {arti_utama}."
+                ans = f"Menurut kamus bahasa Indonesia, kata '{word}' berarti {arti_utama}."
                 if len(defs) > 1:
                     ans += f" Selain itu, kata ini juga dapat bermakna {defs[1]}."
                 if classes:
@@ -355,15 +353,11 @@ class KBBIVocabulary:
                 f"{word} artinya apa?",
                 f"Definisi {word} dong",
                 f"Jelaskan makna kata {word}",
-                f"Tolong carikan arti kata {word} di KBBI",
                 f"Kamu tahu arti {word} nggak?",
                 f"Maksud dari {word} itu apa sih?",
                 f"Apa yang dimaksud {word}?",
-                f"Berikan arti kata {word}",
                 f"kata {word} maksudnya apa?",
-                f"{word}?",
                 f"makna {word}",
-                f"kbbi {word}"
             ]
             
             q = random.choice(q_variants)
@@ -383,8 +377,10 @@ class KBBIVocabulary:
                 "preference_update": {"belajar": 1}
             })
 
-        # 2. Stress Test Idiom & Peribahasa (dengan cerita kontekstual)
-        for idiom, base_word in self.idioms.items():
+        # 2. Idiom & peribahasa (dibatasi agar tidak mendominasi dataset)
+        idiom_items = list(self.idioms.items())
+        random.shuffle(idiom_items)
+        for idiom, base_word in idiom_items[:400]:
             q_variants = [
                 f"Apa arti idiom '{idiom}'?",
                 f"Maksud ungkapan '{idiom}' apa?",
@@ -402,7 +398,9 @@ class KBBIVocabulary:
                 "preference_update": {}
             })
 
-        for pb, base_word in self.peribahasa.items():
+        peribahasa_items = list(self.peribahasa.items())
+        random.shuffle(peribahasa_items)
+        for pb, base_word in peribahasa_items[:400]:
             q_variants = [
                 f"Apa arti peribahasa '{pb}'?",
                 f"Makna pepatah '{pb}'",
@@ -426,7 +424,7 @@ class KBBIVocabulary:
             })
 
         # 3. Tantangan Kalimat (Membuat kalimat dari kata)
-        words_for_sentences = random.sample(sampled_words, min(2000, len(sampled_words)))
+        words_for_sentences = random.sample(sampled_words, min(800, len(sampled_words)))
         for word in words_for_sentences:
             defs = self.all_definitions.get(word, [""])[0]
             if len(defs) < 5: continue

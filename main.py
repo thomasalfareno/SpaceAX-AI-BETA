@@ -36,6 +36,8 @@ def train_cmd(size_override=None, epochs_override=None, regen_data=False):
     from core.kbbi import KBBIVocabulary
 
     config = get_config(auto_detect=True, size_override=size_override)
+    is_promax = config.get("is_promax", False)
+    promax_tier = config.get("promax_tier")
 
     # Override epochs jika diberikan
     if epochs_override:
@@ -73,7 +75,8 @@ def train_cmd(size_override=None, epochs_override=None, regen_data=False):
             kbbi = KBBIVocabulary(kbbi_dir)
             kbbi.load()
             
-            kbbi_pairs = kbbi.generate_rich_training_data(max_pairs=5000)
+            kbbi_cap = 800 if is_promax else 1200
+            kbbi_pairs = kbbi.generate_rich_training_data(max_pairs=kbbi_cap)
             if kbbi_pairs:
                 seed_data["conversations"].extend(kbbi_pairs)
                 seed_data["total"] = len(seed_data["conversations"])
@@ -86,6 +89,30 @@ def train_cmd(size_override=None, epochs_override=None, regen_data=False):
     else:
         print(f"⚠️ Direktori KBBI tidak ditemukan: {kbbi_dir}")
         kbbi = None
+
+    # ProMax: perkuat sampel percakapan + emosi (bukan dominasi KBBI)
+    if is_promax:
+        from training.generate_seed_data import gen_emotions
+        from core.debug_log import agent_log
+
+        emotion_extra = gen_emotions()
+        seed_data["conversations"].extend(emotion_extra)
+        seed_data["total"] = len(seed_data["conversations"])
+        with open(seed_file, "w", encoding="utf-8") as f:
+            json.dump(seed_data, f, ensure_ascii=False, indent=2)
+        print(f"   🏆 ProMax: +{len(emotion_extra)} sampel emosi/konversasi ditambahkan")
+        # #region agent log
+        agent_log(
+            "main.py:train_cmd",
+            "promax_seed_boost",
+            {
+                "emotion_samples_added": len(emotion_extra),
+                "total_conversations": seed_data["total"],
+                "tier": promax_tier,
+            },
+            hypothesis_id="H3",
+        )
+        # #endregion
 
     # ====================================================================
     # 3. Train tokenizer (dengan KBBI corpus)
@@ -148,7 +175,8 @@ def train_cmd(size_override=None, epochs_override=None, regen_data=False):
     train_loader, val_loader = create_dataloaders(
         seed_file, tokenizer,
         batch_size=config["training"].batch_size,
-        max_seq_len=config["model"].max_seq_len
+        max_seq_len=config["model"].max_seq_len,
+        oversample_emotion=is_promax,
     )
     print(f"📦 Training batches: {len(train_loader):,}")
     print(f"📦 Validation batches: {len(val_loader):,}")
@@ -157,8 +185,16 @@ def train_cmd(size_override=None, epochs_override=None, regen_data=False):
     # 6. Train
     # ====================================================================
     from training.trainer import Trainer
-    trainer = Trainer(model, train_loader, val_loader, config["training"], 
-                      tokenizer=tokenizer)
+    trainer = Trainer(
+        model, train_loader, val_loader, config["training"],
+        tokenizer=tokenizer,
+    )
+    trainer.checkpoint_meta = {
+        "profile_name": config.get("profile_name"),
+        "promax_tier": promax_tier,
+        "param_count": param_count,
+        "vocab_size": config["model"].vocab_size,
+    }
 
     cp = os.path.join(config["paths"].checkpoints_dir, "model_best.pt")
     if os.path.exists(cp):
@@ -193,47 +229,6 @@ def train_cmd(size_override=None, epochs_override=None, regen_data=False):
     print()
     trainer.train()
 
-    # ====================================================================
-    # 7. Sample output setelah training
-    # ====================================================================
-    print("\n" + "=" * 60)
-    print("🧪 Sample Output Setelah Training:")
-    print("=" * 60)
-    
-    test_prompts = [
-        "Halo, siapa kamu?",
-        "Apa itu Python?",
-        "Turunan dari sin x adalah?",
-        "1 + 1 berapa?",
-    ]
-    
-    model.eval()
-    for prompt in test_prompts:
-        try:
-            tokens = tokenizer.encode(prompt)
-            if not tokens:
-                continue
-            tokens = [1] + tokens  # BOS
-            
-            generated = model.generate(
-                prompt_tokens=tokens,
-                max_gen_len=100,
-                temperature=0.7,
-                top_p=0.9,
-                top_k=50,
-                eos_id=2
-            )
-            
-            response = tokenizer.decode(generated)
-            # Bersihkan
-            response = response.replace("<BOS>", "").replace("<EOS>", "").strip()
-            
-            print(f"\n  Q: {prompt}")
-            print(f"  A: {response[:200]}")
-        except Exception as e:
-            print(f"\n  Q: {prompt}")
-            print(f"  A: [Error: {e}]")
-    
     print("\n" + "=" * 60)
     print("✅ Training selesai!")
     print(f"   Untuk chat: python main.py chat")
@@ -241,9 +236,9 @@ def train_cmd(size_override=None, epochs_override=None, regen_data=False):
     print("=" * 60)
 
 
-def chat_cmd(mode: str = "normal"):
+def chat_cmd(mode: str = "normal", size_override: str = None):
     from chat import TerminalChat
-    chat = TerminalChat(mode=mode)
+    chat = TerminalChat(mode=mode, size_override=size_override)
     chat.start()
 
 def learn_cmd(topic):
@@ -363,6 +358,9 @@ if __name__ == "__main__":
     # Chat command
     cp = sub.add_parser("chat", help="Mulai ngobrol dengan SpaceAx AI")
     cp.add_argument("--mode", type=str, default="normal", help="Mode chat (normal/chatdev)")
+    cp.add_argument("--size", type=str, default=None,
+                    choices=["small", "medium", "large", "ultra", "promax"],
+                    help="Profil model (promax = tier 1B/4B/8B otomatis)")
 
     # Retrain command
     rp = sub.add_parser("retrain", help="Retrain model dengan data percakapan baru")
@@ -383,9 +381,9 @@ if __name__ == "__main__":
         train_cmd(size_override=args.size, epochs_override=args.epochs, 
                   regen_data=args.regen)
     elif args.command == "chat":
-        chat_cmd(mode=args.mode)
+        chat_cmd(mode=args.mode, size_override=args.size)
     elif args.command == "chatdev":
-        chat_cmd(mode="chatdev")
+        chat_cmd(mode="chatdev", size_override=getattr(args, "size", None))
     elif args.command == "learn":
         learn_cmd(args.topic)
     elif args.command == "retrain":

@@ -29,10 +29,11 @@ class ConversationDataset(Dataset):
     EMO_TOKEN_IDS = set(range(5, 14))
 
     def __init__(self, data_file: str, tokenizer, max_seq_len: int = 512,
-                 augment: bool = True):
+                 augment: bool = True, oversample_emotion: bool = False):
         self.tokenizer = tokenizer
         self.max_seq_len = max_seq_len
         self.augment = augment
+        self.oversample_emotion = oversample_emotion
 
         self.pad_id = tokenizer.special_tokens["<PAD>"]
         self.bos_id = tokenizer.special_tokens["<BOS>"]
@@ -130,6 +131,14 @@ class ConversationDataset(Dataset):
 
             self.samples.append((full_seq, response_start))
 
+            if self.oversample_emotion:
+                emo_topics = {
+                    "emosi", "empati", "sedih", "senang", "marah", "perasaan",
+                }
+                topic = conv.get("topic", "")
+                if emotion != "neutral" or topic in emo_topics or "emosi" in topic:
+                    self.samples.append((full_seq, response_start))
+
     # ------------------------------------------------------------------
     # Dataset interface
     # ------------------------------------------------------------------
@@ -187,6 +196,7 @@ def create_dataloaders(
     split_ratio: float = 0.9,
     augment: bool = True,
     num_workers: Optional[int] = None,
+    oversample_emotion: bool = False,
 ):
     """Buat Train dan Validation DataLoader.
 
@@ -201,7 +211,10 @@ def create_dataloaders(
     """
     import multiprocessing
 
-    dataset = ConversationDataset(data_file, tokenizer, max_seq_len, augment=augment)
+    dataset = ConversationDataset(
+        data_file, tokenizer, max_seq_len,
+        augment=augment, oversample_emotion=oversample_emotion,
+    )
 
     # Split train/val
     train_size = int(split_ratio * len(dataset))

@@ -243,6 +243,7 @@ class Trainer:
         self.patience = 3
 
         self.step = 0
+        self.checkpoint_meta = {}
 
     # ------------------------------------------------------------------
     # Checkpoint
@@ -258,6 +259,7 @@ class Trainer:
             "step": self.step,
             "best_val_loss": self.best_val_loss,
             "patience_counter": self.patience_counter,
+            "meta": getattr(self, "checkpoint_meta", {}),
         }
         torch.save(checkpoint, path)
         if is_best:
@@ -453,23 +455,30 @@ class Trainer:
             )
 
             try:
+                from chat import is_valid_output
+
                 generated_ids = self.model.generate(
                     prompt_tokens=prompt_tokens,
                     max_gen_len=80,
-                    temperature=0.7,
-                    top_p=0.9,
-                    top_k=50,
+                    temperature=0.65,
+                    top_p=0.88,
+                    top_k=40,
                     eos_id=eos_id,
                 )
                 response_text = self.tokenizer.decode(generated_ids)
-                # Bersihkan special token strings dari output (kecuali tag pikir)
                 for st in self.tokenizer.special_tokens:
                     if st not in ["<pikir>", "</pikir>"]:
                         response_text = response_text.replace(st, "")
                 response_text = response_text.strip()
-                # Batasi panjang tampilan
-                if len(response_text) > 150:
+
+                if response_text and not is_valid_output(response_text):
+                    response_text = (
+                        "[belum koheren — lanjutkan training; chat mode tetap pakai fallback profesional]"
+                    )
+                elif len(response_text) > 150:
                     response_text = response_text[:150] + "..."
+                elif not response_text:
+                    response_text = "[kosong — epoch masih awal]"
             except Exception as e:
                 response_text = f"[Error: {e}]"
 

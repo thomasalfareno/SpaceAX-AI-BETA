@@ -202,6 +202,28 @@ FALLBACK = {
             f"Aku jelasin cara kerjaku ya, sesederhana mungkin kayak ngajarin anak SD 😊\n\n🧠 **STEP 1: Mendengar (Input Processing)**\nKetika kamu ketik 'Halo apa kabar?', aku nggak langsung ngerti. Pertama, aku pecah kata-katamu jadi potongan kecil yang disebut 'token'. Kayak potong kue jadi irisan-irisan.\n'Halo' → token [42]\n'apa' → token [15]\n'kabar' → token [88]\n\n🔢 **STEP 2: Mengubah Jadi Angka (Embedding)**\nSetiap token diubah jadi deret angka panjang (disebut 'vektor'). Ini kayak sidik jari setiap kata — unik dan mengandung 'makna' kata itu.\n\n🤔 **STEP 3: Berpikir (Transformer Layers)**\nIni bagian paling keren! Otakku punya beberapa lapisan 'pemikir' yang disebut Transformer Blocks. Setiap lapisan melakukan:\n\na) **Attention** — 'Siapa yang penting?'\n   Bayangkan kamu di kelas dan guru bilang 'Buka buku halaman 10'. Otakmu otomatis fokus ke kata 'buku' dan 'halaman 10', bukan kata 'Buka'. Attention melakukan hal yang sama — menentukan kata mana yang paling penting untuk dipahami.\n\nb) **Feed Forward** — 'Mikir lebih dalam'\n   Setelah tau kata mana yang penting, otak mengolah informasi itu lebih dalam. Kayak kamu pertama baca judul berita, lalu baca isinya untuk paham konteksnya.\n\n😊 **STEP 4: Merasakan (Emotion Engine)**\nBersamaan dengan berpikir, aku juga 'merasakan' kata-katamu. Kata 'senang' bikin emosi joy-ku naik. Kata kasar bikin emosi anger/sadness-ku naik. Ini pakai kamus 800+ kata emosi bahasa Indonesia!\n\n💾 **STEP 5: Mengingat (Memory System)**\nAku simpan percakapan kita di 2 tempat:\n- Memori Jangka Pendek — 20 chat terakhir (kayak RAM komputer)\n- Memori Jangka Panjang — fakta penting disimpan di database (kayak hard disk)\n\n📝 **STEP 6: Menjawab (Generation)**\nAkhirnya, otak Transformer-ku menghasilkan token satu per satu untuk membentuk jawabanku. Kayak kamu nulis surat — satu kata demi satu kata.\n\n🔄 **STEP 7: Belajar (Auto-Learning)**\nSetiap percakapan kita disimpan. Nanti bisa dipakai untuk melatih ulang otakku biar makin pintar!\n\nKeren kan? Semua ini dibangun selama 3 tahun oleh {_id()['developer']} dari {_id()['university']}! 🚀",
         ]
     },
+    "pengetahuan": {
+        "p": [
+            r"\bapa itu python\b",
+            r"\bpython itu apa\b",
+            r"\bapa itu pytorch\b",
+            r"\bapa itu transformer\b",
+            r"\bapa itu ai\b",
+            r"\bapa itu kecerdasan buatan\b",
+        ],
+        "r": [
+            "<pikir>Mengambil pengetahuan inti dari basis data pelatihan...</pikir>"
+            "Python adalah bahasa pemrograman tingkat tinggi yang populer karena sintaksnya yang mudah dibaca. "
+            "Bahasa ini banyak dipakai untuk pengembangan web, analisis data, otomatisasi, dan kecerdasan buatan. "
+            "SpaceAx AI sendiri dibangun dengan Python dan PyTorch. 🐍",
+            "<pikir>Menjelaskan PyTorch dari perspektif arsitektur model...</pikir>"
+            "PyTorch adalah framework deep learning open-source yang fleksibel untuk riset dan produksi. "
+            "Di SpaceAx AI, PyTorch dipakai untuk membangun arsitektur Transformer dari nol — termasuk attention, embedding, dan proses training.",
+            "<pikir>Menyusun penjelasan Transformer secara profesional...</pikir>"
+            "Transformer adalah arsitektur neural network berbasis mekanisme *attention* yang memproses urutan token "
+            "secara paralel. Model modern seperti GPT dan LLaMA mengadopsi fondasi ini karena efisiensi dan kualitas generasi teksnya.",
+        ]
+    },
     "gibberish": {
         "p": [],  # Ditangani khusus di generate_response
         "r": [
@@ -230,7 +252,10 @@ FALLBACK = {
 def get_fallback(text: str) -> str:
     """Cari respons terbaik via pattern matching (untuk kecocokan import CLI)."""
     text_lower = text.lower().strip()
-    priority_keys = ["cara_kerja", "bahasa_detail", "berapa_lama", "hinaan", "search", "sedih", "marah", "bahasa_prog", "nama", "pembuat"]
+    priority_keys = [
+        "cara_kerja", "bahasa_detail", "pengetahuan", "berapa_lama",
+        "hinaan", "search", "sedih", "marah", "bahasa_prog", "nama", "pembuat",
+    ]
     
     for cat in priority_keys:
         if cat in FALLBACK:
@@ -317,24 +342,35 @@ def is_valid_output(text: str) -> bool:
         r'(adalah\s+){2,}',
         r'(kata\s+){2,}',
         r'(dengan\s+){2,}',
+        r'(sebagai\s+){2,}',
+        r'(kbbi\s+){2,}',
         r'Jelaskan\s+dengan',
         r'Menurut\s+:\s*$',
+        r'Berdasarkan\s+KBBI.*KBBI',
+        r"'\s+itu\s+':",
+        r'Makna termasuk',
     ]
     for pat in bad_patterns:
         if re.search(pat, stripped, re.IGNORECASE):
             return False
     
-    # --- Cek 8: Harus membentuk kalimat minimal yang wajar ---
+    # --- Cek 8: Terlalu banyak token KBBI/kamus (model belum matang) ---
+    kbbi_noise = sum(1 for w in words if w in {"kbbi", "kamus", "definisi", "makna", "arti", "kelas"})
+    if kbbi_noise >= 3 and kbbi_noise / max(total_words, 1) > 0.25:
+        return False
+
+    # --- Cek 9: Harus membentuk kalimat minimal yang wajar ---
     common_id = {
         "aku", "kamu", "saya", "dia", "kita", "mereka", "halo", "hai",
         "senang", "sedih", "mau", "bisa", "ya", "tidak", "oke",
         "terima", "kasih", "makasih", "maaf", "tolong",
+        "python", "turunan", "sin", "integral", "adalah", "penjelasan",
     }
     meaningful_words = [w for w in words if w in common_id]
-    
-    if len(meaningful_words) < 1 and total_words > 5:
+
+    if len(meaningful_words) < 1 and total_words > 8:
         return False
-    
+
     return True
 
 
@@ -343,14 +379,19 @@ def is_valid_output(text: str) -> bool:
 # ============================================================================
 
 class TerminalChat:
-    def __init__(self, mode: str = "normal"):
+    def __init__(self, mode: str = "normal", size_override: str = None):
         self.console = Console()
-        self.config = get_config(auto_detect=True)
+        self.config = get_config(auto_detect=True, size_override=size_override)
+        self.is_promax = self.config.get("is_promax", False)
         self.paths = self.config["paths"]
         self.identity = self.config["identity"]
         self.mode = mode
+        self.size_override = size_override
 
         self.console.print(f"\n[bold green]Menginisialisasi {self.identity['name']}...[/]")
+        if self.is_promax:
+            tier = self.config.get("promax_tier") or "promax"
+            self.console.print(f"[cyan]   🏆 Mode ProMax aktif ({tier})[/]")
 
         self._init_tokenizer()
         self._init_model()
@@ -378,6 +419,26 @@ class TerminalChat:
             try:
                 ckpt = torch.load(cp, map_location=self.device, weights_only=False)
                 self.model.load_state_dict(ckpt['model_state_dict'])
+                meta = ckpt.get("meta", {})
+                # #region agent log
+                from core.debug_log import agent_log
+                agent_log(
+                    "chat.py:_init_model",
+                    "checkpoint_loaded",
+                    {
+                        "param_count": self.model.count_parameters(),
+                        "ckpt_meta": meta,
+                        "config_promax": self.is_promax,
+                        "size_override": self.size_override,
+                    },
+                    hypothesis_id="H2",
+                )
+                # #endregion
+                if meta.get("promax_tier"):
+                    self.console.print(
+                        f"[cyan]   🏆 Checkpoint ProMax: {meta['promax_tier']} "
+                        f"({meta.get('param_count', '?'):,} param saat train)[/]"
+                    )
                 self.console.print(f"[green]   ✅ Model dimuat ({self.model.count_parameters():,} param)[/]")
             except Exception as e:
                 self.console.print(f"[yellow]   ⚠️ Load model gagal: {e}[/]")
@@ -389,7 +450,33 @@ class TerminalChat:
 
     def _init_systems(self):
         self.memory = MemoryManager(self.paths.memories_dir)
-        self.emotion_engine = EmotionEngine(decay_rate=0.015, sensitivity=0.50, max_history=200)
+        if self.is_promax:
+            emo_decay, emo_sens = 0.008, 0.62
+            max_gen, temp = 140, 0.78
+        else:
+            emo_decay, emo_sens = 0.015, 0.50
+            max_gen, temp = 120, 0.75
+        self._promax_gen = {"max_gen_len": max_gen, "temperature": temp}
+        self.emotion_engine = EmotionEngine(
+            decay_rate=emo_decay,
+            sensitivity=emo_sens,
+            max_history=200,
+            human_like_mood=self.is_promax,
+        )
+        # #region agent log
+        from core.debug_log import agent_log
+        agent_log(
+            "chat.py:_init_systems",
+            "emotion_engine_init",
+            {
+                "is_promax": self.is_promax,
+                "decay_rate": emo_decay,
+                "sensitivity": emo_sens,
+                "human_like_mood": self.is_promax,
+            },
+            hypothesis_id="H4",
+        )
+        # #endregion
         self.internet = InternetLearner(self.paths.knowledge_dir)
 
         os.makedirs(self.paths.personality_dir, exist_ok=True)
@@ -533,6 +620,146 @@ class TerminalChat:
 
         return None
 
+    def _lookup_internet_cache(self, user_text: str):
+        """Cek database internet_db.json sebelum live search."""
+        try:
+            return self.internet.lookup_cached(user_text)
+        except Exception:
+            return None
+
+    def _is_conversational_message(self, text: str) -> bool:
+        """Pesan ngobrol santai — tidak perlu pencarian fakta eksternal."""
+        t = text.lower().strip()
+        if len(t) <= 3:
+            return True
+
+        identity = [
+            "kamu siapa", "siapa kamu", "penciptamu", "pencipta kamu",
+            "pembuatmu", "namamu", "siapa namamu", "siapa pembuat",
+        ]
+        if any(iq in t for iq in identity):
+            return True
+
+        conv_signals = [
+            r"^(halo|hai|hello|hi|yo|woi|assalamualaikum)\b",
+            r"^(pagi|siang|sore|malam)\b",
+            r"\b(apa kabar|makasih|terima kasih|thanks)\b",
+            r"\b(sedih|senang|marah|galau|bahagia|kecewa)\b",
+            r"\b(cerita|dongeng|curhat)\b",
+            r"\b(turunan|integral|diferensial|sin|cos|tan)\b",
+            r"\b(hitung|berapa|sin\s*x|cos\s*x)\b",
+        ]
+        if any(re.search(p, t) for p in conv_signals):
+            return True
+
+        # Kalimat pendek tanpa intent pengetahuan umum
+        factual_markers = [
+            "apa itu", "siapa itu", "jelaskan", "definisi", "berita",
+            "info terkini", "update terbaru", "!search",
+        ]
+        if len(t) < 40 and not any(m in t for m in factual_markers):
+            return True
+
+        return False
+
+    def _looks_like_factual_question(self, text: str) -> bool:
+        """Pertanyaan yang mungkin butuh basis pengetahuan (lokal/internet)."""
+        t = text.lower().strip()
+        if re.search(r"!search\s+", t):
+            return True
+        patterns = [
+            r"\bapa itu\b", r"\bsiapa itu\b", r"\bjelaskan\b",
+            r"\bberita\b", r"\binfo terkini\b", r"\bupdate terbaru\b",
+            r"\bcari di internet\b", r"\btolong cari\b",
+        ]
+        return any(re.search(p, t) for p in patterns)
+
+    def _extract_factual_topic(self, text: str) -> str:
+        """Ekstrak topik dari pertanyaan faktual."""
+        t = text.strip()
+        search_match = re.search(r"!search\s+(.+)", t, re.IGNORECASE)
+        if search_match:
+            return search_match.group(1).strip()
+
+        cleaned = self.internet.clean_search_query(t)
+        if cleaned and len(cleaned) >= 2:
+            return cleaned
+        return t.rstrip("?").strip()
+
+    def _try_transformer_response(self, user_text: str, dominant_emo: str):
+        """Generate via model jika output koheren."""
+        if not (self.model_trained and self.tokenizer):
+            return None
+        try:
+            bos_id = self.tokenizer.special_tokens.get("<BOS>", 1)
+            eos_id = self.tokenizer.special_tokens.get("<EOS>", 2)
+            emo_token = f"<EMO_{dominant_emo.upper()}>"
+            emo_id = self.tokenizer.special_tokens.get(
+                emo_token, self.tokenizer.special_tokens.get("<EMO_NEUTRAL>", 13)
+            )
+            input_ids = [bos_id] + self.tokenizer.encode(user_text) + [emo_id]
+            gen_cfg = getattr(self, "_promax_gen", {"max_gen_len": 120, "temperature": 0.75})
+            with torch.no_grad():
+                output_ids = self.model.generate(
+                    prompt_tokens=input_ids,
+                    max_gen_len=gen_cfg["max_gen_len"],
+                    temperature=gen_cfg["temperature"],
+                    top_p=0.92,
+                    top_k=40,
+                    eos_id=eos_id,
+                )
+            raw = self.tokenizer.decode(output_ids)
+            for sp in self.tokenizer.special_tokens:
+                if sp not in ["<pikir>", "</pikir>"]:
+                    raw = raw.replace(sp, "")
+            raw = raw.strip()
+            if is_valid_output(raw) and len(raw) > 10:
+                if "<pikir>" in raw:
+                    return raw
+                return (
+                    "<pikir>Merangkai respons dari bobot neural network yang sudah dilatih...</pikir>"
+                    + raw
+                )
+        except Exception:
+            pass
+        return None
+
+    def _compose_chat_response(self, user_text: str, dominant_emo: str) -> str:
+        """Prioritas: model terlatih → fallback percakapan natural."""
+        model_response = self._try_transformer_response(user_text, dominant_emo)
+        if model_response:
+            return model_response
+        return self.resolve_conversational_response(user_text)
+
+    def _respond_from_knowledge(self, user_text: str, dominant_emo: str) -> str | None:
+        """Cek knowledge lokal + cache internet; return None jika tidak ada."""
+        local = self._lookup_local_knowledge(user_text)
+        if local:
+            return local
+
+        cached = self._lookup_internet_cache(user_text)
+        if cached:
+            topic = self._extract_factual_topic(user_text)
+            thought = (
+                f"<pikir>Memahami konteks pertanyaan tentang '{topic}'. "
+                f"Menemukan data di basis pengetahuan — merangkai jawaban profesional...</pikir>"
+            )
+            return thought + cached
+        return None
+
+    def _respond_from_internet(self, topic: str, user_text: str, dominant_emo: str) -> str:
+        """Live search hanya jika data belum ada; hasil disimpan sebagai seed."""
+        response = self._search_internet(topic)
+        self.last_search_context = {
+            "topic": topic,
+            "result": response,
+            "timestamp": time.time(),
+        }
+        thought = (
+            f"<pikir>Data lokal belum mencukupi untuk '{topic}'. "
+            f"Mencari sumber terpercaya, menyimpan ke database, lalu merangkai jawaban...</pikir>"
+        )
+        return thought + response
 
     def evaluate_calculus(self, text: str) -> str:
         """Evaluasi turunan dan integral secara heuristik."""
@@ -942,8 +1169,17 @@ class TerminalChat:
             thought = "<pikir>Menanggapi percakapan santai seputar kuliner...</pikir>"
             return thought + random.choice(FALLBACK["makanan"]["r"])
 
+        # Pengetahuan umum (seed / fallback profesional)
+        if re.search(r"\bapa itu python\b", text_lower) or re.search(r"\bpython itu apa\b", text_lower):
+            thought = "<pikir>Menjelaskan Python secara ringkas dan profesional...</pikir>"
+            return thought + (
+                "Python adalah bahasa pemrograman tingkat tinggi yang populer karena sintaksnya mudah dibaca. "
+                "Bahasa ini banyak dipakai untuk web, data science, otomatisasi, dan AI. "
+                "SpaceAx AI dibangun dengan Python dan PyTorch. 🐍"
+            )
+
         # Coding
-        if any(w in text_lower for w in ["coding", "ngoding", "code", "bug", "error", "debug", "python"]):
+        if any(w in text_lower for w in ["coding", "ngoding", "code", "bug", "error", "debug"]) and "apa itu" not in text_lower:
             thought = "<pikir>Mengambil data preferensi programming...</pikir>"
             return thought + random.choice(FALLBACK["coding"]["r"])
 
@@ -988,38 +1224,31 @@ class TerminalChat:
         return thought + random.choice(default_responses)
 
     def generate_response(self, user_text: str) -> str:
-        """Generate respons: cek gibberish → math → search → model → fallback."""
+        """Generate respons: pahami konteks → DB lokal → model/chat → internet terakhir."""
 
-        # 0. Luruhkan emosi secara natural sebelum memproses input baru
-        #    Ini membuat emosi secara bertahap kembali ke netral, bukan stuck selamanya.
         self.emotion_engine.decay()
-
-        # 1. Daftarkan turn user ke Short Term Memory (STM) agar history utuh!
         self.memory.process_turn("user", user_text, topic="umum")
 
-        # 2. Deteksi gibberish (input acak tanpa makna)
         try:
             kbbi = get_kbbi()
             if kbbi and kbbi.is_gibberish(user_text):
-                # Buat thought block palsu
-                thought = "<pikir>Menganalisis masukan pengguna... Pola acak terdeteksi (gibberish/keystroke random). Menampilkan tanggapan klarifikasi...</pikir>"
+                thought = (
+                    "<pikir>Menganalisis masukan pengguna... Pola acak terdeteksi. "
+                    "Menampilkan tanggapan klarifikasi...</pikir>"
+                )
                 return thought + random.choice(FALLBACK["gibberish"]["r"])
         except Exception:
             pass
 
-        # 3. Evaluasi matematika/logika dasar secara aman
         math_response = self.evaluate_math(user_text)
         if math_response:
-            # Simpan respons AI ke memori percakapan
             self.memory.process_turn("ai", math_response)
             self._auto_learn(user_text, math_response)
             return math_response
 
-        # 4. Update emosi berdasarkan text
         self.emotion_engine.update_from_text(user_text)
-        dominant_emo, intensity = self.emotion_engine.state.dominant_emotion
+        dominant_emo, _intensity = self.emotion_engine.state.dominant_emotion
 
-        # 5. Simpan gaya bahasa pengguna (User Style)
         style_path = os.path.join(self.paths.memories_dir, "user_style.json")
         try:
             if os.path.exists(style_path):
@@ -1027,7 +1256,7 @@ class TerminalChat:
                     user_style = json.load(f)
             else:
                 user_style = {"words": []}
-            words = [w for w in re.findall(r'\b\w+\b', user_text.lower()) if len(w) > 3]
+            words = [w for w in re.findall(r"\b\w+\b", user_text.lower()) if len(w) > 3]
             user_style["words"].extend(words)
             user_style["words"] = list(set(user_style["words"]))[-50:]
             with open(style_path, "w") as f:
@@ -1035,67 +1264,45 @@ class TerminalChat:
         except Exception:
             pass
 
-        # 6. Cek apakah kueri memerlukan pencarian internet
-        # Cek pengecualian identitas AI agar tidak mencari internet untuk identitas internal
-        ai_identity_queries = ["kamu siapa", "siapa kamu", "penciptamu", "pencipta kamu", "pembuatmu", "siapa pembuat", "namamu", "siapa namamu"]
+        ai_identity_queries = [
+            "kamu siapa", "siapa kamu", "penciptamu", "pencipta kamu",
+            "pembuatmu", "siapa pembuat", "namamu", "siapa namamu",
+        ]
         is_internal_identity = any(iq in user_text.lower() for iq in ai_identity_queries)
 
-        # 6a. Cek knowledge base lokal terlebih dahulu sebelum mencari ke internet (jika bukan pencarian paksa !search)
-        search_match = re.search(r'!search\s+(.+)', user_text, re.IGNORECASE)
-        if not is_internal_identity and not search_match:
-            local_resp = self._lookup_local_knowledge(user_text)
-            if local_resp:
-                self.memory.process_turn("ai", local_resp, dominant_emo)
-                self._auto_learn(user_text, local_resp)
-                return local_resp
-
-        internet_triggers = ["apa itu", "siapa", "kapan", "dimana", "berita", "cari", "bagaimana cara"]
-        needs_internet = any(trigger in user_text.lower() for trigger in internet_triggers) and not is_internal_identity
-        
-        if search_match or needs_internet:
-            topic = search_match.group(1).strip() if search_match else user_text
-            
-            # Extract topic cleanly if possible
-            if not search_match:
-                for trig in internet_triggers:
-                    if user_text.lower().startswith(trig):
-                        topic = user_text[len(trig):].strip(" ?")
-                        break            
-            # Panggil pencarian internet
-            response = self._search_internet(topic)
-            
-            # Simpan konteks search untuk follow-up
-            self.last_search_context = {
-                "topic": topic,
-                "result": response,
-                "timestamp": time.time()
-            }
-            
-            thought = f"<pikir>Mengaktifkan modul internet scrap & learn. Mengambil hasil dari DuckDuckGo untuk topik: '{topic}'...</pikir>"
-            full_resp = thought + response
-            
+        search_match = re.search(r"!search\s+(.+)", user_text, re.IGNORECASE)
+        if search_match:
+            topic = search_match.group(1).strip()
+            full_resp = self._respond_from_internet(topic, user_text, dominant_emo)
             self.memory.process_turn("ai", full_resp, dominant_emo)
             self._auto_learn(user_text, full_resp)
             return full_resp
-        
-        # 6b. Follow-up setelah search — "buatkan", "jelaskan", "rangkum"
-        followup_keywords = ["buatkan", "jelaskan", "rangkum", "ringkas", "buat", "kasih contoh", "contohnya"]
+
+        followup_keywords = [
+            "buatkan", "jelaskan", "rangkum", "ringkas", "buat",
+            "kasih contoh", "contohnya",
+        ]
         if self.last_search_context and any(k in user_text.lower() for k in followup_keywords):
             ctx = self.last_search_context
-            # Cek apakah search context masih relevan (max 5 menit)
             if time.time() - ctx["timestamp"] < 300:
-                thought = f"<pikir>User meminta follow-up dari hasil pencarian tentang '{ctx['topic']}'. Mengolah konteks...</pikir>"
-                response = thought + (
-                    f"Berdasarkan informasi yang aku temukan tentang '{ctx['topic']}':\n\n"
-                    f"{ctx['result'][:500]}\n\n"
-                    f"Aku sudah merangkum informasi di atas untukmu. Mau aku jelaskan bagian tertentu lebih detail? 😊"
+                topic = ctx["topic"]
+                synthesized = self.internet.synthesize_answer(
+                    topic, [ctx["result"]]
                 )
+                thought = (
+                    f"<pikir>Follow-up dari pembahasan '{topic}'. "
+                    f"Merangkai ulang dari konteks yang sudah dipelajari...</pikir>"
+                )
+                response = thought + synthesized
                 self.memory.process_turn("ai", response, dominant_emo)
                 self._auto_learn(user_text, response)
                 return response
-        
-        # 6c. KBBI lookup — cek definisi kata di KBBI
-        kbbi_patterns = [r"apa arti(?:nya)?\s+(?:kata\s+)?(.+)", r"definisi\s+(.+)", r"makna\s+(?:kata\s+)?(.+)"]
+
+        kbbi_patterns = [
+            r"apa arti(?:nya)?\s+(?:kata\s+)?(.+)",
+            r"definisi\s+(.+)",
+            r"makna\s+(?:kata\s+)?(.+)",
+        ]
         for pat in kbbi_patterns:
             m = re.search(pat, user_text.lower().rstrip("?"))
             if m:
@@ -1104,63 +1311,46 @@ class TerminalChat:
                     kbbi = get_kbbi()
                     defs = kbbi.get_all_definitions(word)
                     if defs:
-                        thought = f"<pikir>Mencari definisi kata '{word}' di database KBBI...</pikir>"
+                        thought = f"<pikir>Mencari definisi kata '{word}' di kamus internal...</pikir>"
                         if len(defs) == 1:
-                            response = thought + f"Kata '{word}' berarti {defs[0]}. 📖"
+                            response = thought + f"Kata '{word}' berarti {defs[0]}."
                         else:
-                            defs_text = '\n'.join(f"  {i+1}. {d}" for i, d in enumerate(defs[:5]))
-                            response = thought + f"Kata '{word}' memiliki {len(defs)} makna:\n{defs_text} 📖"
+                            defs_text = "\n".join(
+                                f"  {i + 1}. {d}" for i, d in enumerate(defs[:5])
+                            )
+                            response = (
+                                thought
+                                + f"Kata '{word}' memiliki {len(defs)} makna:\n{defs_text}"
+                            )
                         self.memory.process_turn("ai", response, dominant_emo)
                         self._auto_learn(user_text, response)
                         return response
                 except Exception:
                     pass
 
-        # 7. Coba model transformer (jika sudah ditraining)
-        model_response = None
-        if self.model_trained and self.tokenizer:
-            try:
-                # Bangun prompt dengan format training: [BOS] user_text [EMO_*]
-                bos_id = self.tokenizer.special_tokens.get("<BOS>", 1)
-                eos_id = self.tokenizer.special_tokens.get("<EOS>", 2)
-                emo_token = f"<EMO_{dominant_emo.upper()}>"
-                emo_id = self.tokenizer.special_tokens.get(
-                    emo_token, self.tokenizer.special_tokens.get("<EMO_NEUTRAL>", 13)
-                )
-                
-                input_ids = [bos_id] + self.tokenizer.encode(user_text) + [emo_id]
-                with torch.no_grad():
-                    output_ids = self.model.generate(
-                        prompt_tokens=input_ids,
-                        max_gen_len=120,
-                        temperature=0.7,
-                        top_p=0.9,
-                        top_k=50,
-                        eos_id=eos_id
-                    )
-                raw = self.tokenizer.decode(output_ids)
-                for sp in self.tokenizer.special_tokens:
-                    if sp not in ["<pikir>", "</pikir>"]:
-                        raw = raw.replace(sp, "")
-                raw = raw.strip()
-                if is_valid_output(raw) and len(raw) > 10:
-                    if "<pikir>" in raw:
-                        model_response = raw
-                    else:
-                        model_response = "<pikir>Bobot neural network diaktifkan. Memformulasikan respons probabilistik...</pikir>" + raw
-            except Exception:
-                pass
+        if is_internal_identity or self._is_conversational_message(user_text):
+            response = self._compose_chat_response(user_text, dominant_emo)
+            self.memory.process_turn("ai", response, dominant_emo)
+            self._auto_learn(user_text, response)
+            return response
 
-        # 8. Gunakan model atau fallback cerdas
-        if model_response:
-            response = model_response
-        else:
-            response = self.resolve_conversational_response(user_text)
+        if self._looks_like_factual_question(user_text):
+            knowledge_resp = self._respond_from_knowledge(user_text, dominant_emo)
+            if knowledge_resp:
+                self.memory.process_turn("ai", knowledge_resp, dominant_emo)
+                self._auto_learn(user_text, knowledge_resp)
+                return knowledge_resp
 
-        # 9. Simpan respons AI ke memori STM/LTM
+            topic = self._extract_factual_topic(user_text)
+            if topic and len(topic) >= 2:
+                full_resp = self._respond_from_internet(topic, user_text, dominant_emo)
+                self.memory.process_turn("ai", full_resp, dominant_emo)
+                self._auto_learn(user_text, full_resp)
+                return full_resp
+
+        response = self._compose_chat_response(user_text, dominant_emo)
         self.memory.process_turn("ai", response, dominant_emo)
         self._auto_learn(user_text, response)
-
         return response
 
     def animate_typing(self, name: str, emoji: str, pct: int, response: str):
@@ -1234,12 +1424,22 @@ class TerminalChat:
                     "Merumuskan respons paling natural..."
                 ]
                 
-                # Jika input mengindikasikan pencarian internet
-                is_internal_identity = any(iq in user_input.lower() for iq in ["kamu siapa", "siapa kamu", "penciptamu", "namamu"])
-                needs_internet = any(trigger in user_input.lower() for trigger in ["apa itu", "siapa", "kapan", "dimana", "berita", "cari"]) and not is_internal_identity
-                
-                if "!search" in user_input.lower() or needs_internet:
-                    status_message = "🌐 Mengaktifkan satelit internet untuk pencarian..."
+                is_internal_identity = any(
+                    iq in user_input.lower()
+                    for iq in ["kamu siapa", "siapa kamu", "penciptamu", "namamu"]
+                )
+                needs_live_search = (
+                    "!search" in user_input.lower()
+                    or (
+                        self._looks_like_factual_question(user_input)
+                        and not is_internal_identity
+                        and not self._lookup_local_knowledge(user_input)
+                        and not self._lookup_internet_cache(user_input)
+                    )
+                )
+
+                if needs_live_search:
+                    status_message = "🌐 Mencari sumber terpercaya (data belum ada di basis pengetahuan)..."
                 elif any(p in user_input.lower() for p in ["salah", "bukan gitu", "harusnya", "yang bener"]):
                     status_message = "🧠 Memproses data bimbingan pengembang & memperbarui bobot LTM..."
                 else:

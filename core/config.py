@@ -91,18 +91,22 @@ MODEL_PROFILES = {
         "batch_size": 2, "label": "ULTRA (~650M params)",
         "min_ram_gb": 32.0,
     },
+    # Alias — sub-tier dipilih di auto_model_config via core.promax
     "promax": {
         "d_model": 1536, "n_heads": 24, "n_layers": 28,
         "d_ff": 6144, "max_seq_len": 1024, "vocab_size": 64000,
-        "batch_size": 1, "label": "PROMAX (~1.2B params - Super Intelligent)",
+        "batch_size": 1, "label": "PROMAX (auto-tier 1B/4B/8B)",
         "min_ram_gb": 48.0,
     },
 }
 
 def auto_model_config(size_override: str = None):
     """Pilih konfigurasi model otomatis berdasarkan RAM atau override manual."""
+    from core.debug_log import agent_log
+
     total_ram = get_system_ram_gb()
     avail_ram = get_available_ram_gb()
+    vram_gb = get_gpu_vram_gb()
 
     print(f"🖥️  Hardware terdeteksi:")
     print(f"   Total RAM: {total_ram:.1f} GB")
@@ -128,7 +132,29 @@ def auto_model_config(size_override: str = None):
         else:
             profile_name = "small"
 
-    profile = MODEL_PROFILES[profile_name]
+    promax_tier = None
+    if profile_name == "promax":
+        from core.promax import resolve_promax_tier, get_promax_profile
+        force = os.environ.get("SPACEAX_PROMAX_TIER")
+        promax_tier = resolve_promax_tier(total_ram, vram_gb, force_tier=force)
+        profile = get_promax_profile(promax_tier)
+        # #region agent log
+        agent_log(
+            "config.py:auto_model_config",
+            "promax_tier_resolved",
+            {
+                "tier": promax_tier,
+                "total_ram_gb": round(total_ram, 2),
+                "vram_gb": round(vram_gb, 2),
+                "est_params": profile.get("est_params"),
+                "vocab_size": profile.get("vocab_size"),
+                "size_override": size_override,
+            },
+            hypothesis_id="H1",
+        )
+        # #endregion
+    else:
+        profile = MODEL_PROFILES[profile_name]
 
     # Warn jika RAM mungkin tidak cukup (hanya jika auto-detect, bukan manual override)
     if not size_override and total_ram < profile["min_ram_gb"]:
@@ -153,11 +179,13 @@ def auto_model_config(size_override: str = None):
     label = profile["label"]
 
     print(f"   🧠 Profil Model: {label}")
+    if promax_tier:
+        print(f"      🏆 ProMax tier: {promax_tier}")
     print(f"      d_model={cfg.d_model}, n_heads={cfg.n_heads}, "
           f"n_layers={cfg.n_layers}, d_ff={cfg.d_ff}")
     print(f"      vocab_size={cfg.vocab_size}, max_seq_len={cfg.max_seq_len}")
 
-    return cfg, batch, label
+    return cfg, batch, label, promax_tier, profile_name
 
 
 @dataclass
@@ -243,8 +271,19 @@ def get_config(auto_detect: bool = True, size_override: str = None):
     paths.ensure_dirs()
 
     if auto_detect:
-        model_cfg, batch_size, label = auto_model_config(size_override)
+        model_cfg, batch_size, label, promax_tier, profile_name = auto_model_config(
+            size_override
+        )
         training_cfg = TrainingConfig(batch_size=batch_size)
+
+        if promax_tier or size_override == "promax":
+            from core.promax import apply_promax_training_overrides
+            apply_promax_training_overrides(training_cfg)
+            print(
+                f"   🏆 ProMax training: epochs≥{training_cfg.num_epochs}, "
+                f"warmup={training_cfg.warmup_steps}, "
+                f"accum={training_cfg.gradient_accumulation_steps}"
+            )
         
         # CPU Mode Optimization
         if not torch.cuda.is_available():
@@ -278,7 +317,9 @@ def get_config(auto_detect: bool = True, size_override: str = None):
         
         # Tentukan optimizer_type otomatis
         total_ram = get_system_ram_gb()
-        is_large_model = size_override in ["ultra", "promax"] or (size_override is None and total_ram >= 32.0)
+        is_large_model = size_override in ["ultra", "promax"] or promax_tier or (
+            size_override is None and total_ram >= 32.0
+        )
         if is_large_model or total_ram < 16.0:
             training_cfg.optimizer_type = "adafactor"
             print(f"   ⚙️  RAM Manajemen: Mengaktifkan optimizer low-memory 'adafactor' (menghemat ~9.6GB RAM).")
@@ -287,6 +328,7 @@ def get_config(auto_detect: bool = True, size_override: str = None):
     else:
         model_cfg = ModelConfig()
         training_cfg = TrainingConfig()
+        profile_name = size_override or "medium"
 
     return {
         "model": model_cfg,
@@ -294,4 +336,7 @@ def get_config(auto_detect: bool = True, size_override: str = None):
         "paths": paths,
         "emotion": EmotionConfig(),
         "identity": AI_IDENTITY,
+        "profile_name": profile_name if auto_detect else "medium",
+        "promax_tier": promax_tier if auto_detect else None,
+        "is_promax": bool(promax_tier or size_override == "promax"),
     }

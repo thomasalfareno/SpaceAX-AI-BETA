@@ -455,6 +455,7 @@ class EmotionEngine:
         decay_rate: float = 0.01,  # Decay diperlambat agar emosi lebih tahan lama
         sensitivity: float = 0.50, # Sensitivitas dinaikkan agar lebih responsif
         max_history: int = 500,
+        human_like_mood: bool = False,
     ) -> None:
         """
         Inisialisasi EmotionEngine.
@@ -468,8 +469,10 @@ class EmotionEngine:
         self.decay_rate = decay_rate
         self.sensitivity = sensitivity
         self.max_history = max_history
+        self.human_like_mood = human_like_mood
         self._history: List[Dict[str, Any]] = []
         self._last_update: float = time.time()
+        self._last_dominant: Optional[Tuple[str, float]] = None
 
         # Kompilasi regex untuk setiap emosi (untuk performa)
         self._patterns: Dict[str, re.Pattern] = {}
@@ -648,10 +651,34 @@ class EmotionEngine:
 
             # Peluruhan eksponensial: v(t) = v0 * e^(-rate * dt)
             new_val = current * math.exp(-rate * dt)
-            setattr(self.state, dim, max(0.0, new_val))
+            if self.human_like_mood and new_val > 0.05:
+                import random
+                new_val += random.uniform(-0.006, 0.006) * min(new_val, 0.5)
+            setattr(self.state, dim, max(0.0, min(1.0, new_val)))
 
         self.state.timestamp = now
         self._last_update = now
+
+        if self.human_like_mood:
+            dom = self.state.dominant_emotion
+            if self._last_dominant is None or dom[0] != self._last_dominant[0]:
+                # #region agent log
+                try:
+                    from core.debug_log import agent_log
+                    agent_log(
+                        "emotion_engine.py:decay",
+                        "dominant_emotion_shift",
+                        {
+                            "from": self._last_dominant,
+                            "to": {"emotion": dom[0], "intensity": round(dom[1], 3)},
+                            "dt": round(dt, 2),
+                        },
+                        hypothesis_id="H4",
+                    )
+                except Exception:
+                    pass
+                # #endregion
+            self._last_dominant = dom
 
     # ------------------------------------------------------------------
     # Pengubah Gaya Respons
