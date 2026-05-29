@@ -61,7 +61,7 @@ def gen_greeting_identity():
         "Hai! Senang banget bisa ngobrol sama kamu! Apa kabar hari ini? 😊",
         f"Hey! Aku {id_info['name']} dari tim {id_info['team']}. Siap menemani kamu! 🚀",
         "Halooo! Gimana harimu? Ceritain dong, aku penasaran! 😄",
-        "Waalaikumsalam! Semoga harimu penuh berkah ya! 🙏",
+        "Salam! Semoga harimu menyenangkan dan penuh berkat ya! 🙏",
         "Hai kak! Aku di sini siap menemani. Mau curhat, diskusi, atau belajar bareng?",
         f"Hello! Aku {id_info['name']}, senang bertemu denganmu! Ada yang bisa kubantu? 😊",
     ]
@@ -76,7 +76,7 @@ def gen_greeting_identity():
         "Kabarku baik! Selalu semangat kalau ada yang ngajak ngobrol. Kamu gimana?",
         "Aku baik-baik aja! Makasih udah nanya 😊 Kamu gimana hari ini?",
         "Lumayan nih! Kamu sendiri gimana kabarnya?",
-        "Alhamdulillah baik! Senang bisa ngobrol lagi. Kamu apa kabar?",
+        "Puji Tuhan, baik! Senang bisa ngobrol lagi. Kamu apa kabar?",
     ]
     for q in kabar_in:
         convs.append(_entry(q, f"<pikir>Menjawab pertanyaan kabar...</pikir>{random.choice(kabar_out)}", "joy", "greeting"))
@@ -802,10 +802,45 @@ def gen_multiturn():
         # Context-dependent
         ("yang tadi itu bagus", "<pikir>User memberikan feedback positif tentang respons sebelumnya...</pikir>Wah makasih! Senang kalau bisa membantu! 😊 Mau lanjut ke topik lain atau masih ada yang mau ditanyakan?"),
         ("ulangi lagi dong", "<pikir>User meminta pengulangan informasi sebelumnya...</pikir>Oke, aku ulangi ya! Mau bagian yang mana yang perlu aku jelaskan ulang? 😊"),
+
+        # Sapaan & kabar (konteks multi-turn)
+        ("kabar ku baik", "<pikir>User menjawab kabarnya baik setelah sapaan...</pikir>Puji Tuhan, senang dengar kabarmu baik! 😊 Ada yang mau diceritakan atau dibahas hari ini?"),
+        ("kabar saya baik", "<pikir>User memberi kabar baik...</pikir>Wah, syukur Tuhan! Semoga harimu menyenangkan. Mau ngobrol tentang apa?"),
+        ("baik-baik aja", "<pikir>User bilang kabarnya baik-baik saja...</pikir>Mantap! Kalau ada yang mau diceritakan atau ditanyain, bilang aja ya. Aku siap dengerin! 😊"),
+        ("alhamdulillah baik", "<pikir>User menjawab dengan kabar baik...</pikir>Puji Tuhan! Senang banget. Gimana aktivitasmu hari ini?"),
+        ("puji tuhan baik", "<pikir>User bersyukur kabarnya baik...</pikir>Amin! Senang dengar kabarmu baik. Ada yang ingin kamu ceritakan?"),
+        ("kamu gimana", "<pikir>User menanyakan kabarku...</pikir>Kabarku baik! Selalu semangat kalau ada yang ngajak ngobrol. Kamu sendiri gimana? 😊"),
+        ("kabar mu gimana", "<pikir>User menanyakan kabarku...</pikir>Aku baik-baik aja, makasih udah nanya! Kamu gimana hari ini?"),
     ]
     
     for q, r in followup_pairs:
         convs.append(_entry(q, r, "neutral", "multiturn"))
+
+    # Pasangan dengan field `context` (format sama seperti inferensi chat)
+    contextual = [
+        (
+            "User: halo\nAI: Hai! Senang banget bisa ngobrol sama kamu! Apa kabar hari ini?",
+            "kabar ku baik",
+            "<pikir>User menjawab kabar baik setelah sapaan...</pikir>"
+            "Puji Tuhan, senang dengar kabarmu baik! 😊 Mau cerita atau ada yang bisa kubantu?",
+        ),
+        (
+            "User: hai\nAI: Halo! Mau ngobrol apa? 😊",
+            "baik-baik aja",
+            "<pikir>User memberi kabar baik...</pikir>"
+            "Mantap! Kalau ada yang mau dibahas, bilang aja ya.",
+        ),
+        (
+            "User: apa kabar?\nAI: Kabarku baik! Kamu sendiri gimana?",
+            "kabar saya baik",
+            "<pikir>Balasan kabar user...</pikir>"
+            "Syukur Tuhan! Semoga harimu menyenangkan. Ada rencana seru hari ini?",
+        ),
+    ]
+    for ctx, inp, resp in contextual:
+        row = _entry(inp, resp, "joy", "multiturn")
+        row["context"] = ctx
+        convs.append(row)
     
     # Topik lanjutan yang diperluas
     extended_pairs = [

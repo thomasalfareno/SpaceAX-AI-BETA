@@ -3,33 +3,37 @@ SpaceaxAI - Data Loader & Dataset
 Memproses format data percakapan menjadi input/target tensor untuk model causal LM.
 
 Response-only loss masking:
-  Format sequence: [BOS] user_tokens [EMO_*] ai_tokens [EOS]
-  Loss hanya dihitung pada ai_tokens dan [EOS].
-  Token sebelum dan termasuk [EMO_*] mendapat label -100 (diabaikan CrossEntropyLoss).
+  Format sequence: <BOS> user_tokens [EMO_*] ai_tokens <EOS>
+  Loss hanya dihitung pada ai_tokens dan <EOS>.
+
+Augmentasi on-the-fly (train): paraphrase + kadang tanpa blok <pikir>
+agar model belajar merangkai kata, bukan menghafal satu kalimat tetap.
 """
 
 import json
 import random
+import hashlib
 import torch
 from torch.utils.data import Dataset, DataLoader
 from typing import List, Tuple, Dict, Optional
 
+from training.text_augment import augment_conversation_pair, strip_thought_blocks
+
 
 class ConversationDataset(Dataset):
-    """Dataset untuk causal language modeling dari data percakapan.
+    """Dataset causal LM — tokenisasi per batch dengan augmentasi opsional."""
 
-    Setiap sample menghasilkan (input_ids, labels) di mana:
-      - input_ids: tokens[:-1]   (konteks untuk model)
-      - labels   : tokens[1:]    (target prediksi)
-    Labels di-mask ke -100 untuk semua posisi sebelum respons AI,
-    sehingga CrossEntropyLoss hanya menghitung loss pada token respons.
-    """
-
-    # ID token emosi (5-13) — digunakan sebagai pemisah user ↔ AI
     EMO_TOKEN_IDS = set(range(5, 14))
 
-    def __init__(self, data_file: str, tokenizer, max_seq_len: int = 512,
-                 augment: bool = True, oversample_emotion: bool = False):
+    def __init__(
+        self,
+        conversations: List[dict],
+        tokenizer,
+        max_seq_len: int = 512,
+        augment: bool = False,
+        oversample_emotion: bool = False,
+        dedupe_inputs: bool = True,
+    ):
         self.tokenizer = tokenizer
         self.max_seq_len = max_seq_len
         self.augment = augment
@@ -39,144 +43,129 @@ class ConversationDataset(Dataset):
         self.bos_id = tokenizer.special_tokens["<BOS>"]
         self.eos_id = tokenizer.special_tokens["<EOS>"]
 
-        with open(data_file, 'r', encoding='utf-8') as f:
+        self.conversations = self._filter_and_dedupe(conversations, dedupe_inputs)
+        self.index_map: List[int] = []
+        self._build_index_map()
+
+    @classmethod
+    def from_file(
+        cls,
+        data_file: str,
+        tokenizer,
+        max_seq_len: int = 512,
+        augment: bool = False,
+        oversample_emotion: bool = False,
+    ) -> "ConversationDataset":
+        with open(data_file, "r", encoding="utf-8") as f:
             data = json.load(f)
-            self.conversations = data.get('conversations', [])
+        convs = data.get("conversations", [])
+        return cls(
+            convs,
+            tokenizer,
+            max_seq_len=max_seq_len,
+            augment=augment,
+            oversample_emotion=oversample_emotion,
+        )
 
-        # Setiap elemen: (full_seq, response_start_idx)
-        # response_start_idx = indeks pertama token AI dalam full_seq
-        self.samples: List[Tuple[List[int], int]] = []
-        self._prepare_data()
-
-    # ------------------------------------------------------------------
-    # Data preparation
-    # ------------------------------------------------------------------
-
-    def _resolve_emotion_id(self, emotion_str: str) -> int:
-        """Dapatkan ID token emosi, fallback ke EMO_NEUTRAL."""
-        emo_token_str = f"<EMO_{emotion_str.upper()}>"
-        if emo_token_str in self.tokenizer.special_tokens:
-            return self.tokenizer.special_tokens[emo_token_str]
-        return self.tokenizer.special_tokens["<EMO_NEUTRAL>"]
-
-    def _augment_text(self, text: str) -> str:
-        """Augmentasi ringan: acak upper/lower huruf pertama."""
-        if not text:
-            return text
-        if random.random() < 0.3:
-            return text[0].swapcase() + text[1:]
-        return text
-
-    def _build_and_truncate(self, user_tokens: List[int], emo_id: int,
-                            ai_tokens: List[int]) -> Tuple[List[int], int]:
-        """Bangun sequence lengkap dan truncate jika perlu.
-
-        Format: [BOS] user_tokens [EMO] ai_tokens [EOS]
-        Prioritas: pertahankan respons AI utuh, potong user input jika perlu.
-
-        Returns:
-            (full_seq, response_start)
-            response_start = indeks token AI pertama di full_seq
-        """
-        # Overhead tetap: BOS + EMO + EOS = 3 token
-        overhead = 3
-        max_content = self.max_seq_len - overhead  # ruang untuk user + ai tokens
-
-        if max_content <= 0:
-            # max_seq_len terlalu kecil, minimal sequence
-            full_seq = [self.bos_id, emo_id, self.eos_id]
-            return full_seq, 2  # response_start menunjuk EOS
-
-        total_content = len(user_tokens) + len(ai_tokens)
-
-        if total_content <= max_content:
-            # Muat semua
-            pass
-        elif len(ai_tokens) <= max_content:
-            # Potong user tokens, pertahankan AI utuh
-            avail_user = max_content - len(ai_tokens)
-            # Ambil bagian akhir user tokens (konteks terdekat lebih penting)
-            user_tokens = user_tokens[-avail_user:] if avail_user > 0 else []
-        else:
-            # AI tokens sendiri sudah melebihi kapasitas — potong AI juga
-            # Sisakan minimal 10 token user untuk konteks
-            min_user = min(10, len(user_tokens))
-            avail_ai = max_content - min_user
-            user_tokens = user_tokens[-min_user:]
-            ai_tokens = ai_tokens[:max(avail_ai, 1)]
-
-        full_seq = [self.bos_id] + user_tokens + [emo_id] + ai_tokens + [self.eos_id]
-        response_start = len(user_tokens) + 2  # +1 BOS, +1 EMO
-        return full_seq, response_start
-
-    def _prepare_data(self):
-        """Tokenize semua percakapan dan simpan sebagai samples."""
-        for conv in self.conversations:
-            user_text = conv.get("input", "").strip()
-            ai_text = conv.get("response", "").strip()
-            emotion = conv.get("emotion", "neutral")
-
-            if not user_text or not ai_text:
+    def _filter_and_dedupe(
+        self, conversations: List[dict], dedupe: bool
+    ) -> List[dict]:
+        seen = set()
+        out = []
+        for conv in conversations:
+            inp = (conv.get("input") or "").strip()
+            resp = (conv.get("response") or "").strip()
+            if not inp or not resp:
                 continue
+            key = hashlib.md5(inp.lower().encode()).hexdigest()
+            if dedupe and key in seen:
+                continue
+            seen.add(key)
+            out.append(conv)
+        return out
 
-            emo_id = self._resolve_emotion_id(emotion)
-
-            # Encode teks
-            user_tokens = self.tokenizer.encode(user_text)
-            ai_tokens = self.tokenizer.encode(ai_text)
-
-            full_seq, response_start = self._build_and_truncate(
-                user_tokens, emo_id, ai_tokens
-            )
-
-            self.samples.append((full_seq, response_start))
+    def _build_index_map(self):
+        """Indeks ke conversations; duplikat indeks = oversample dengan augment berbeda."""
+        rng = random.Random(42)
+        for i, conv in enumerate(self.conversations):
+            self.index_map.append(i)
+            if self.augment and rng.random() < 0.35:
+                self.index_map.append(i)
 
             if self.oversample_emotion:
                 emo_topics = {
                     "emosi", "empati", "sedih", "senang", "marah", "perasaan",
                 }
                 topic = conv.get("topic", "")
+                emotion = conv.get("emotion", "neutral")
                 if emotion != "neutral" or topic in emo_topics or "emosi" in topic:
-                    self.samples.append((full_seq, response_start))
+                    self.index_map.append(i)
 
-    # ------------------------------------------------------------------
-    # Dataset interface
-    # ------------------------------------------------------------------
+    def _resolve_emotion_id(self, emotion_str: str) -> int:
+        emo_token_str = f"<EMO_{emotion_str.upper()}>"
+        if emo_token_str in self.tokenizer.special_tokens:
+            return self.tokenizer.special_tokens[emo_token_str]
+        return self.tokenizer.special_tokens["<EMO_NEUTRAL>"]
 
-    def __len__(self):
-        return len(self.samples)
+    def _build_and_truncate(
+        self, user_tokens: List[int], emo_id: int, ai_tokens: List[int]
+    ) -> Tuple[List[int], int]:
+        overhead = 3
+        max_content = self.max_seq_len - overhead
 
-    def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
-        full_seq, response_start = self.samples[idx]
+        if max_content <= 0:
+            full_seq = [self.bos_id, emo_id, self.eos_id]
+            return full_seq, 2
 
-        # Opsional: augmentasi saat training (rebuild jika augment aktif)
-        # Karena kita menyimpan token, augmentasi dilakukan di level token-ID
-        # (kita hanya bisa augmentasi teks sebelum tokenisasi, tapi itu mahal).
-        # Pendekatan efisien: augmentasi sudah diterapkan saat _prepare_data
-        # atau bisa diabaikan saat inference.
+        total_content = len(user_tokens) + len(ai_tokens)
 
-        # Untuk Causal LM:
-        #   Input:  tokens[0 : n-1]
-        #   Target: tokens[1 : n]
-        seq = list(full_seq)  # copy agar tidak mutate
+        if total_content <= max_content:
+            pass
+        elif len(ai_tokens) <= max_content:
+            avail_user = max_content - len(ai_tokens)
+            user_tokens = user_tokens[-avail_user:] if avail_user > 0 else []
+        else:
+            min_user = min(10, len(user_tokens))
+            avail_ai = max_content - min_user
+            user_tokens = user_tokens[-min_user:]
+            ai_tokens = ai_tokens[: max(avail_ai, 1)]
+
+        full_seq = [self.bos_id] + user_tokens + [emo_id] + ai_tokens + [self.eos_id]
+        response_start = len(user_tokens) + 2
+        return full_seq, response_start
+
+    def _conv_to_tensors(self, conv: dict) -> Tuple[torch.Tensor, torch.Tensor]:
+        user_text = conv.get("input", "").strip()
+        ai_text = conv.get("response", "").strip()
+        emotion = conv.get("emotion", "neutral")
+        context = conv.get("context", "").strip()
+
+        if self.augment:
+            user_text, ai_text = augment_conversation_pair(user_text, ai_text)
+            if random.random() < 0.3:
+                stripped = strip_thought_blocks(ai_text)
+                if stripped and len(stripped) > 8:
+                    ai_text = stripped
+
+        emo_id = self._resolve_emotion_id(emotion)
+
+        if context:
+            user_text = f"{context}\nUser: {user_text}"
+
+        user_tokens = self.tokenizer.encode(user_text)
+        ai_tokens = self.tokenizer.encode(ai_text)
+
+        full_seq, response_start = self._build_and_truncate(
+            user_tokens, emo_id, ai_tokens
+        )
+
+        seq = list(full_seq)
         input_ids = seq[:-1]
         target_ids = seq[1:]
 
-        # ---- Response-only loss masking ----
-        # Dalam full_seq: [BOS] user... [EMO] ai... [EOS]
-        # response_start = indeks token AI pertama di full_seq
-        #
-        # Dalam target_ids (= full_seq[1:]):
-        #   posisi i di target_ids memprediksi full_seq[i+1]
-        #   Kita ingin loss hanya pada token AI dan EOS.
-        #   Token AI pertama di full_seq ada di index response_start.
-        #   Di target_ids, itu berada di posisi (response_start - 1).
-        #   Semua posisi sebelum itu harus -100.
-
-        mask_end = response_start - 1  # posisi terakhir yang di-mask + 1
+        mask_end = response_start - 1
         labels = [-100] * mask_end + target_ids[mask_end:]
 
-        # Padding ke max_seq_len
         pad_len = self.max_seq_len - len(input_ids)
         if pad_len > 0:
             input_ids = input_ids + [self.pad_id] * pad_len
@@ -186,6 +175,13 @@ class ConversationDataset(Dataset):
             torch.tensor(input_ids, dtype=torch.long),
             torch.tensor(labels, dtype=torch.long),
         )
+
+    def __len__(self):
+        return len(self.index_map)
+
+    def __getitem__(self, idx) -> Tuple[torch.Tensor, torch.Tensor]:
+        conv = self.conversations[self.index_map[idx]]
+        return self._conv_to_tensors(conv)
 
 
 def create_dataloaders(
@@ -198,47 +194,52 @@ def create_dataloaders(
     num_workers: Optional[int] = None,
     oversample_emotion: bool = False,
 ):
-    """Buat Train dan Validation DataLoader.
-
-    Args:
-        data_file: Path ke file JSON percakapan.
-        tokenizer: Instance BPETokenizer.
-        batch_size: Ukuran batch.
-        max_seq_len: Panjang maksimum sequence (termasuk special tokens).
-        split_ratio: Rasio train/total.
-        augment: Aktifkan augmentasi data.
-        num_workers: Jumlah worker DataLoader (None = auto-detect).
-    """
+    """Buat Train dan Validation DataLoader."""
     import multiprocessing
 
-    dataset = ConversationDataset(
-        data_file, tokenizer, max_seq_len,
-        augment=augment, oversample_emotion=oversample_emotion,
+    with open(data_file, "r", encoding="utf-8") as f:
+        all_convs = json.load(f).get("conversations", [])
+
+    n = len(all_convs)
+    indices = list(range(n))
+    rng = random.Random(42)
+    rng.shuffle(indices)
+
+    train_n = max(1, int(split_ratio * n)) if n > 1 else n
+    train_idx_set = set(indices[:train_n])
+    val_idx_set = set(indices[train_n:])
+
+    train_convs = [all_convs[i] for i in range(n) if i in train_idx_set]
+    val_convs = [all_convs[i] for i in range(n) if i in val_idx_set]
+    if not val_convs:
+        val_convs = train_convs[: max(1, len(train_convs) // 10)]
+
+    train_dataset = ConversationDataset(
+        train_convs,
+        tokenizer,
+        max_seq_len,
+        augment=augment,
+        oversample_emotion=oversample_emotion,
+        dedupe_inputs=True,
+    )
+    val_dataset = ConversationDataset(
+        val_convs,
+        tokenizer,
+        max_seq_len,
+        augment=False,
+        oversample_emotion=False,
+        dedupe_inputs=True,
     )
 
-    # Split train/val
-    train_size = int(split_ratio * len(dataset))
-    val_size = len(dataset) - train_size
-
-    if train_size == 0 or val_size == 0:
-        # Data terlalu sedikit — gunakan seluruhnya untuk keduanya
-        train_dataset = dataset
-        val_dataset = dataset
-    else:
-        train_dataset, val_dataset = torch.utils.data.random_split(
-            dataset, [train_size, val_size],
-            generator=torch.Generator().manual_seed(42)
-        )
-
-    # Auto-detect num_workers
     from core.config import get_system_ram_gb
+
     total_ram = get_system_ram_gb()
 
     if num_workers is None:
         if torch.cuda.is_available() and total_ram >= 16.0:
             num_workers = min(2, multiprocessing.cpu_count() or 0)
         else:
-            num_workers = 0  # Force 0 workers on low RAM or CPU to prevent duplicating RAM in child processes
+            num_workers = 0
 
     use_pin_memory = torch.cuda.is_available()
 
@@ -246,7 +247,7 @@ def create_dataloaders(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
-        drop_last=True,
+        drop_last=len(train_dataset) >= batch_size,
         num_workers=num_workers,
         pin_memory=use_pin_memory,
     )
@@ -256,6 +257,15 @@ def create_dataloaders(
         shuffle=False,
         num_workers=num_workers,
         pin_memory=use_pin_memory,
+    )
+
+    aug_note = (
+        " (augmentasi on-the-fly: paraphrase + variasi jawaban)"
+        if augment
+        else ""
+    )
+    print(
+        f"   📚 Train: {len(train_dataset):,} sampel | Val: {len(val_dataset):,}{aug_note}"
     )
 
     return train_loader, val_loader

@@ -455,7 +455,7 @@ class Trainer:
             )
 
             try:
-                from chat import is_valid_output
+                from chat import is_valid_output, is_valid_output_relaxed
 
                 generated_ids = self.model.generate(
                     prompt_tokens=prompt_tokens,
@@ -471,9 +471,12 @@ class Trainer:
                         response_text = response_text.replace(st, "")
                 response_text = response_text.strip()
 
-                if response_text and not is_valid_output(response_text):
+                ok = is_valid_output(response_text) or (
+                    epoch <= 3 and is_valid_output_relaxed(response_text)
+                )
+                if response_text and not ok:
                     response_text = (
-                        "[belum koheren — lanjutkan training; chat mode tetap pakai fallback profesional]"
+                        "[belum koheren — lanjutkan training; augmentasi + lebih banyak epoch]"
                     )
                 elif len(response_text) > 150:
                     response_text = response_text[:150] + "..."
@@ -496,6 +499,11 @@ class Trainer:
 
         print(f"🚀 Memulai training di device: {self.device}")
         print(f"   Parameter: {self.model.count_parameters():,}")
+        print(
+            "   💡 Epoch 1: model belajar pola bahasa (bukan hafalan 1:1); "
+            "augmentasi on-the-fly memperbanyak variasi frasa. "
+            "Chat bagus biasanya setelah val_loss < 4 (ProMax: ≥15–30 epoch)."
+        )
         print(f"   Epochs: {self.config.num_epochs}")
         print(f"   Batch size: {self.config.batch_size}")
         print(f"   Batches per epoch: {len(self.train_loader)}")

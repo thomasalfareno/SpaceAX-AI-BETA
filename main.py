@@ -23,7 +23,14 @@ def ensure_setup():
               "data/conversation_logs"]:
         os.makedirs(os.path.join(base_dir, d), exist_ok=True)
 
-def train_cmd(size_override=None, epochs_override=None, regen_data=False):
+def train_cmd(
+    size_override=None,
+    epochs_override=None,
+    regen_data=False,
+    promax_tier=None,
+    batch_size=None,
+    grad_accum=None,
+):
     print("=" * 60)
     print("🧠 SpaceAx AI — Training Pipeline v2")
     print("   Oleh: Thomas Alfareno Ananta Nugraha — ITS Surabaya")
@@ -35,13 +42,39 @@ def train_cmd(size_override=None, epochs_override=None, regen_data=False):
     from core.model import SpaceaxModel
     from core.kbbi import KBBIVocabulary
 
+    if promax_tier:
+        os.environ["SPACEAX_PROMAX_TIER"] = promax_tier
+        if not size_override:
+            size_override = "promax"
+
     config = get_config(auto_detect=True, size_override=size_override)
     is_promax = config.get("is_promax", False)
     promax_tier = config.get("promax_tier")
 
+    tc = config["training"]
+    if batch_size is not None:
+        tc.batch_size = max(1, batch_size)
+    if grad_accum is not None:
+        tc.gradient_accumulation_steps = max(1, grad_accum)
+    eff_batch = tc.batch_size * tc.gradient_accumulation_steps
+    print(
+        f"\n   📊 Batch: {tc.batch_size} × accum {tc.gradient_accumulation_steps} "
+        f"= effective batch {eff_batch}"
+    )
+    print(
+        "   💡 Batch besar menstabilkan gradien, tetapi TIDAK menurunkan val_loss/PPL "
+        "secara ajaib — kualitas bahasa butuh cukup epoch + data."
+    )
+
     # Override epochs jika diberikan
     if epochs_override:
         config["training"].num_epochs = epochs_override
+        if is_promax and epochs_override < 10:
+            print(
+                f"\n   ⚠️  ProMax dengan hanya {epochs_override} epoch biasanya belum cukup "
+                f"(val_loss masih tinggi, chat belum koheren). "
+                f"Disarankan ≥30 epoch atau tanpa --epochs."
+            )
 
     # ====================================================================
     # 1. Generate seed data (+ KBBI training data)
@@ -89,6 +122,22 @@ def train_cmd(size_override=None, epochs_override=None, regen_data=False):
     else:
         print(f"⚠️ Direktori KBBI tidak ditemukan: {kbbi_dir}")
         kbbi = None
+
+    # Variasi komposisi (intent → banyak susunan kata, anti-hafalan contoh)
+    from training.composition_variants import augment_dataset_dict
+
+    has_compose = any(
+        str(c.get("topic", "")).startswith("compose_")
+        for c in seed_data.get("conversations", [])[:300]
+    )
+    if not has_compose or regen_data:
+        compose_n = augment_dataset_dict(
+            seed_data, max_per_intent=12 if is_promax else 8
+        )
+        if compose_n:
+            with open(seed_file, "w", encoding="utf-8") as f:
+                json.dump(seed_data, f, ensure_ascii=False, indent=2)
+            print(f"   ✍️  +{compose_n} variasi komposisi (paraphrase intent) ditambahkan")
 
     # ProMax: perkuat sampel percakapan + emosi (bukan dominasi KBBI)
     if is_promax:
@@ -236,7 +285,11 @@ def train_cmd(size_override=None, epochs_override=None, regen_data=False):
     print("=" * 60)
 
 
-def chat_cmd(mode: str = "normal", size_override: str = None):
+def chat_cmd(mode: str = "normal", size_override: str = None, promax_tier: str = None):
+    if promax_tier:
+        os.environ["SPACEAX_PROMAX_TIER"] = promax_tier
+        if not size_override:
+            size_override = "promax"
     from chat import TerminalChat
     chat = TerminalChat(mode=mode, size_override=size_override)
     chat.start()
@@ -250,7 +303,13 @@ def learn_cmd(topic):
     entries = learner.learn_topic(topic, max_articles=5)
     print(f"✅ Selesai! {len(entries)} artikel dipelajari.")
 
-def retrain_cmd(size_override=None, epochs_override=None):
+def retrain_cmd(
+    size_override=None,
+    epochs_override=None,
+    promax_tier=None,
+    batch_size=None,
+    grad_accum=None,
+):
     """Retrain model dengan data baru dari percakapan."""
     print("🔄 Auto-retrain dengan data percakapan baru...")
     ensure_setup()
@@ -300,7 +359,13 @@ def retrain_cmd(size_override=None, epochs_override=None):
     for f_name in os.listdir(vocab_dir):
         os.remove(os.path.join(vocab_dir, f_name))
 
-    train_cmd(size_override=size_override, epochs_override=epochs_override)
+    train_cmd(
+        size_override=size_override,
+        epochs_override=epochs_override,
+        promax_tier=promax_tier,
+        batch_size=batch_size,
+        grad_accum=grad_accum,
+    )
 
 def test_cmd():
     print("=" * 55)
@@ -352,6 +417,17 @@ if __name__ == "__main__":
                     default=None, help="Override ukuran model (default: auto-detect)")
     tp.add_argument("--epochs", type=int, default=None, 
                     help="Override jumlah epoch training")
+    tp.add_argument(
+        "--promax-tier",
+        type=str,
+        choices=["promax_1b", "promax_4b", "promax_8b"],
+        default=None,
+        help="Paksa sub-tier ProMax (4B/8B butuh RAM/VRAM besar). Sama dengan env SPACEAX_PROMAX_TIER",
+    )
+    tp.add_argument("--batch-size", type=int, default=None,
+                    help="Override batch size per device")
+    tp.add_argument("--grad-accum", type=int, default=None,
+                    help="Override gradient accumulation steps")
     tp.add_argument("--regen", action="store_true",
                     help="Regenerasi seed data dan tokenizer dari awal")
 
@@ -361,6 +437,13 @@ if __name__ == "__main__":
     cp.add_argument("--size", type=str, default=None,
                     choices=["small", "medium", "large", "ultra", "promax"],
                     help="Profil model (promax = tier 1B/4B/8B otomatis)")
+    cp.add_argument(
+        "--promax-tier",
+        type=str,
+        choices=["promax_1b", "promax_4b", "promax_8b"],
+        default=None,
+        help="Paksa tier saat load checkpoint (set env SPACEAX_PROMAX_TIER)",
+    )
 
     # Retrain command
     rp = sub.add_parser("retrain", help="Retrain model dengan data percakapan baru")
@@ -368,6 +451,14 @@ if __name__ == "__main__":
                     default=None, help="Override ukuran model")
     rp.add_argument("--epochs", type=int, default=None,
                     help="Override jumlah epoch")
+    rp.add_argument(
+        "--promax-tier",
+        type=str,
+        choices=["promax_1b", "promax_4b", "promax_8b"],
+        default=None,
+    )
+    rp.add_argument("--batch-size", type=int, default=None)
+    rp.add_argument("--grad-accum", type=int, default=None)
 
     lp = sub.add_parser("learn", help="Suruh AI belajar dari internet")
     lp.add_argument("topic", type=str, help="Topik yang ingin dipelajari")
@@ -378,16 +469,32 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.command == "train":
-        train_cmd(size_override=args.size, epochs_override=args.epochs, 
-                  regen_data=args.regen)
+        train_cmd(
+            size_override=args.size,
+            epochs_override=args.epochs,
+            regen_data=args.regen,
+            promax_tier=getattr(args, "promax_tier", None),
+            batch_size=getattr(args, "batch_size", None),
+            grad_accum=getattr(args, "grad_accum", None),
+        )
     elif args.command == "chat":
-        chat_cmd(mode=args.mode, size_override=args.size)
+        chat_cmd(
+            mode=args.mode,
+            size_override=args.size,
+            promax_tier=getattr(args, "promax_tier", None),
+        )
     elif args.command == "chatdev":
         chat_cmd(mode="chatdev", size_override=getattr(args, "size", None))
     elif args.command == "learn":
         learn_cmd(args.topic)
     elif args.command == "retrain":
-        retrain_cmd(size_override=args.size, epochs_override=args.epochs)
+        retrain_cmd(
+            size_override=args.size,
+            epochs_override=args.epochs,
+            promax_tier=getattr(args, "promax_tier", None),
+            batch_size=getattr(args, "batch_size", None),
+            grad_accum=getattr(args, "grad_accum", None),
+        )
     elif args.command == "test":
         test_cmd()
     else:

@@ -19,6 +19,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.text import Text
+from typing import List
 
 # Diamkan warning dari model/torch/duckduckgo_search
 warnings.filterwarnings("ignore")
@@ -63,7 +64,7 @@ FALLBACK = {
             "Hey! Aku di sini siap menemani. Mau curhat, diskusi, atau belajar bareng? 🚀",
             f"Halooo! Aku {_id()['name']} dari {_id()['team']}. Mau bahas apa nih?",
             "Hai! Gimana harimu? Ceritain dong, aku penasaran! 😄",
-            "Waalaikumsalam! Semoga harimu penuh berkah ya! 🙏",
+            "Salam! Semoga harimu menyenangkan dan penuh berkat ya! 🙏",
         ]
     },
     "kabar": {
@@ -374,6 +375,34 @@ def is_valid_output(text: str) -> bool:
     return True
 
 
+def is_valid_output_relaxed(text: str) -> bool:
+    """Validator lebih longgar — dipakai saat checkpoint masih belajar (val_loss 4–6)."""
+    if not text or len(text.strip()) < 2:
+        return False
+    stripped = text.strip()
+    words = re.findall(r"\b\w+\b", stripped.lower())
+    if len(words) < 2:
+        return False
+    from collections import Counter
+
+    word_counts = Counter(words)
+    total_words = len(words)
+    for word, count in word_counts.items():
+        if count >= 4 and count / total_words > 0.55:
+            return False
+    unique_ratio = len(set(words)) / total_words
+    if total_words > 6 and unique_ratio < 0.2:
+        return False
+    vowels = sum(1 for c in text.lower() if c in "aiueo")
+    if vowels / max(len(text), 1) < 0.08:
+        return False
+    bad = [r"arti.*makna.*kamus", r"(yang\s+){3,}", r"(adalah\s+){3,}"]
+    for pat in bad:
+        if re.search(pat, stripped, re.IGNORECASE):
+            return False
+    return True
+
+
 # ============================================================================
 # Terminal Chat — Main Class
 # ============================================================================
@@ -415,10 +444,12 @@ class TerminalChat:
         self.model = SpaceaxModel(self.config["model"])
 
         cp = os.path.join(self.paths.checkpoints_dir, "model_best.pt")
+        self.checkpoint_val_loss = float("inf")
         if os.path.exists(cp):
             try:
                 ckpt = torch.load(cp, map_location=self.device, weights_only=False)
                 self.model.load_state_dict(ckpt['model_state_dict'])
+                self.checkpoint_val_loss = float(ckpt.get("best_val_loss", float("inf")))
                 meta = ckpt.get("meta", {})
                 # #region agent log
                 from core.debug_log import agent_log
@@ -440,6 +471,23 @@ class TerminalChat:
                         f"({meta.get('param_count', '?'):,} param saat train)[/]"
                     )
                 self.console.print(f"[green]   ✅ Model dimuat ({self.model.count_parameters():,} param)[/]")
+                tier = self._model_val_loss_tier()
+                if tier == "mature":
+                    self.console.print(
+                        f"[green]   📈 Kualitas checkpoint: val_loss={self.checkpoint_val_loss:.3f} "
+                        f"(generasi neural prioritas utama)[/]"
+                    )
+                elif tier in ("learning", "early"):
+                    self.console.print(
+                        f"[cyan]   📊 Checkpoint belajar: val_loss={self.checkpoint_val_loss:.3f} "
+                        f"— model dicoba dulu (validator adaptif), lalu fallback[/]"
+                    )
+                else:
+                    self.console.print(
+                        f"[yellow]   📉 Checkpoint masih mentah: val_loss={self.checkpoint_val_loss:.3f}. "
+                        f"Chat memakai fallback cerdas + memori konteks; lanjutkan training "
+                        f"(ProMax: ≥30 epoch, target val_loss < 3.5).[/]"
+                    )
             except Exception as e:
                 self.console.print(f"[yellow]   ⚠️ Load model gagal: {e}[/]")
         else:
@@ -686,24 +734,82 @@ class TerminalChat:
             return cleaned
         return t.rstrip("?").strip()
 
-    def _try_transformer_response(self, user_text: str, dominant_emo: str):
-        """Generate via model jika output koheren."""
+    def _strip_ai_response_for_prompt(self, content: str) -> str:
+        """Ambil teks jawaban AI tanpa blok <pikir> untuk prompt generasi."""
+        if "</pikir>" in content:
+            return content.split("</pikir>", 1)[-1].strip()
+        if "<pikir>" in content:
+            return ""
+        return content.strip()
+
+    def _build_generation_prompt(self, user_text: str, dominant_emo: str) -> List[int]:
+        """Susun prompt: BOS + konteks STM + pesan user + token emosi (sesuai format training)."""
+        bos_id = self.tokenizer.special_tokens.get("<BOS>", 1)
+        emo_token = f"<EMO_{dominant_emo.upper()}>"
+        emo_id = self.tokenizer.special_tokens.get(
+            emo_token, self.tokenizer.special_tokens.get("<EMO_NEUTRAL>", 13)
+        )
+
+        history = self.memory.stm.buffer
+        prior = history[:-1] if history and history[-1].get("role") == "user" else history
+
+        lines: List[str] = []
+        for turn in prior[-8:]:
+            if turn["role"] == "user":
+                lines.append(f"User: {turn['content']}")
+            else:
+                ai_text = self._strip_ai_response_for_prompt(turn["content"])
+                if ai_text:
+                    lines.append(f"AI: {ai_text}")
+
+        if lines:
+            user_block = "\n".join(lines) + f"\nUser: {user_text}"
+        else:
+            user_block = user_text
+
+        return [bos_id] + self.tokenizer.encode(user_block) + [emo_id]
+
+    def _model_val_loss_tier(self) -> str:
+        """Tingkat kesiapan checkpoint untuk generasi neural."""
+        v = getattr(self, "checkpoint_val_loss", float("inf"))
+        if v <= 3.5:
+            return "mature"
+        if v <= 5.5:
+            return "learning"
+        if v <= 7.5:
+            return "early"
+        return "raw"
+
+    def _try_transformer_response(
+        self, user_text: str, dominant_emo: str, *, strict: bool = True
+    ):
+        """Generate via model; strict=False memakai validator lebih longgar."""
         if not (self.model_trained and self.tokenizer):
             return None
+
+        tier = self._model_val_loss_tier()
+        if tier == "raw":
+            return None
+        if strict and tier not in ("mature", "learning"):
+            return None
+        if not strict and tier == "raw":
+            return None
+
         try:
-            bos_id = self.tokenizer.special_tokens.get("<BOS>", 1)
             eos_id = self.tokenizer.special_tokens.get("<EOS>", 2)
-            emo_token = f"<EMO_{dominant_emo.upper()}>"
-            emo_id = self.tokenizer.special_tokens.get(
-                emo_token, self.tokenizer.special_tokens.get("<EMO_NEUTRAL>", 13)
-            )
-            input_ids = [bos_id] + self.tokenizer.encode(user_text) + [emo_id]
+            input_ids = self._build_generation_prompt(user_text, dominant_emo)
             gen_cfg = getattr(self, "_promax_gen", {"max_gen_len": 120, "temperature": 0.75})
+            temp = gen_cfg["temperature"]
+            if tier == "learning":
+                temp = min(0.85, temp + 0.05)
+            elif tier == "early":
+                temp = min(0.9, temp + 0.1)
+
             with torch.no_grad():
                 output_ids = self.model.generate(
                     prompt_tokens=input_ids,
                     max_gen_len=gen_cfg["max_gen_len"],
-                    temperature=gen_cfg["temperature"],
+                    temperature=temp,
                     top_p=0.92,
                     top_k=40,
                     eos_id=eos_id,
@@ -713,11 +819,13 @@ class TerminalChat:
                 if sp not in ["<pikir>", "</pikir>"]:
                     raw = raw.replace(sp, "")
             raw = raw.strip()
-            if is_valid_output(raw) and len(raw) > 10:
+            min_len = 8 if not strict else 10
+            check = is_valid_output if strict else is_valid_output_relaxed
+            if check(raw) and len(raw) >= min_len:
                 if "<pikir>" in raw:
                     return raw
                 return (
-                    "<pikir>Merangkai respons dari bobot neural network yang sudah dilatih...</pikir>"
+                    "<pikir>Merangkai respons dari pola yang dipelajari, bukan salinan contoh...</pikir>"
                     + raw
                 )
         except Exception:
@@ -725,8 +833,12 @@ class TerminalChat:
         return None
 
     def _compose_chat_response(self, user_text: str, dominant_emo: str) -> str:
-        """Prioritas: model terlatih → fallback percakapan natural."""
-        model_response = self._try_transformer_response(user_text, dominant_emo)
+        """Prioritas: model (ketat → longgar) → fallback percakapan."""
+        model_response = self._try_transformer_response(user_text, dominant_emo, strict=True)
+        if not model_response:
+            model_response = self._try_transformer_response(
+                user_text, dominant_emo, strict=False
+            )
         if model_response:
             return model_response
         return self.resolve_conversational_response(user_text)
@@ -1074,6 +1186,46 @@ class TerminalChat:
                     f"Beliau sangat menyukai riset Artificial Intelligence dan Deep Learning, makanya aku dibangun dari nol selama kurang lebih 3 tahun! Hebat kan? 😎"
                 )
 
+        # Follow-up sapaan & kabar (user menjawab setelah AI menanyakan kabar)
+        kabar_ask_markers = [
+            "apa kabar", "gimana kabar", "how are you", "kabar hari",
+            "kabar kamu", "kabar mu",
+        ]
+        last_asked_kabar = any(m in last_ai_response for m in kabar_ask_markers)
+        user_reports_well = any(
+            p in text_lower
+            for p in [
+                "baik", "baik-baik", "baik baik", "kabar baik", "kabar ku baik",
+                "kabar saya baik", "kabar ku bagus", "alhamdulillah", "puji tuhan",
+                "syukur tuhan", "sehat",
+                "aman saja", "lagi baik", "masih baik", "oke kok", "okey",
+            ]
+        ) and len(text_lower) < 80
+
+        if last_asked_kabar and user_reports_well:
+            thought = (
+                "<pikir>User menjawab kabar baik setelah aku menanyakan kabar. "
+                "Merespons dengan empati dan balik bertanya...</pikir>"
+            )
+            replies = [
+                "Puji Tuhan, senang dengar kabarmu baik! 😊 Ada yang mau diceritakan hari ini, atau ada yang bisa kubantu?",
+                "Syukur Tuhan kalau kabarmu baik! Aku ikut senang. Mau ngobrol tentang apa nih?",
+                "Wah mantap! Semoga harimu makin menyenangkan ya. Ada topik seru yang mau dibahas?",
+            ]
+            return thought + random.choice(replies)
+
+        # User menanyakan balik kabar AI setelah sapaan
+        if any(p in text_lower for p in ["kamu gimana", "kamu gimana?", "kabar mu", "kabar kamu", "kamu baik"]):
+            thought = "<pikir>User menanyakan kabarku setelah sapaan...</pikir>"
+            return thought + random.choice(FALLBACK["kabar"]["r"])
+
+        # Balasan singkat setelah greeting AI ("halo" → user "halo" / "hei" lagi)
+        greeting_words = ["halo", "hai", "hello", "hi", "hey", "woi", "pagi", "siang", "sore", "malam"]
+        last_was_greeting = any(w in last_ai_response for w in greeting_words + ["apa kabar", "ngobrol"])
+        if last_was_greeting and any(w in text_lower for w in greeting_words) and len(text_lower) < 25:
+            thought = "<pikir>Meneruskan sapaan ramah...</pikir>"
+            return thought + random.choice(FALLBACK["greeting"]["r"])
+
         # Follow up bahasa pemrograman
         about_tech_keywords = ["bahasa", "program", "python", "pytorch", "teknologi", "module", "coding", "bikinnya pakai"]
         last_about_tech = any(k in last_user_query or k in last_ai_response for k in about_tech_keywords)
@@ -1098,8 +1250,15 @@ class TerminalChat:
         # --------------------------------------------------------------------
         # KASUS C: PEMCOCOKAN KATA KUNCI UTAMA (SUFFIX TOLERANT)
         # --------------------------------------------------------------------
+        # Sapaan salam (netral, tanpa ungkapan khas satu agama)
+        if "assalamualaikum" in text_lower:
+            thought = "<pikir>Menyambut dengan salam ramah (netral)...</pikir>"
+            return thought + (
+                "Salam! Halo juga 😊 Senang bisa ngobrol. Apa kabar hari ini?"
+            )
+
         # Greeting
-        if any(w in text_lower for w in ["halo", "hai", "hello", "hi", "yo", "woi", "assalamualaikum", "pagi", "siang", "sore", "malam", "ping", "hay"]):
+        if any(w in text_lower for w in ["halo", "hai", "hello", "hi", "yo", "woi", "pagi", "siang", "sore", "malam", "ping", "hay"]):
             thought = "<pikir>Menyambut user dengan ramah sesuai identitas...</pikir>"
             return thought + random.choice(FALLBACK["greeting"]["r"])
             

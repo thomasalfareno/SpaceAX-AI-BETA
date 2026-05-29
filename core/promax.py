@@ -60,6 +60,23 @@ def resolve_promax_tier(
     force_tier: promax_1b | promax_4b | promax_8b (env SPACEAX_PROMAX_TIER)
     """
     if force_tier and force_tier in PROMAX_TIERS:
+        ram = total_ram if total_ram is not None else get_system_ram_gb()
+        need = PROMAX_TIERS[force_tier]["min_ram_gb"]
+        vram = vram_gb if vram_gb is not None else get_gpu_vram_gb()
+        if ram < need:
+            print(
+                f"   ⚠️  SPACEAX_PROMAX_TIER={force_tier}: RAM {ram:.1f} GB "
+                f"< rekomendasi {need:.0f} GB — risiko OOM / swap lambat."
+            )
+        if force_tier == "promax_4b" and 0 < vram < 24:
+            print(
+                f"   ⚠️  VRAM {vram:.1f} GB: 4B biasanya butuh ≥24 GB (L4/A10) "
+                f"atau batch=1 + checkpointing di Colab Pro+."
+            )
+        if force_tier == "promax_8b" and 0 < vram < 40:
+            print(
+                f"   ⚠️  VRAM {vram:.1f} GB: 8B biasanya butuh ≥40 GB (A100 40GB+)."
+            )
         return force_tier
 
     ram = total_ram if total_ram is not None else get_system_ram_gb()
