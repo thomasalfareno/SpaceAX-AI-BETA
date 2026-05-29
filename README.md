@@ -117,7 +117,7 @@ SpaceaxAiDebug/
 ### Linux (Arch, Ubuntu, dll.)
 
 ```bash
-git clone <url-repo-anda>
+git clone https://github.com/thomasalfareno/SpaceAX-AI-BETA
 cd SpaceaxAiDebug
 unzip -o kbbi/kbbi_v_part.zip -d kbbi/   # sesuaikan path zip Anda
 
