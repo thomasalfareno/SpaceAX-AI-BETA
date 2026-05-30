@@ -13,6 +13,7 @@ Training pipeline yang diperkuat:
 import os
 import sys
 import gc
+import time
 import argparse
 import torch
 
@@ -40,11 +41,13 @@ def train_cmd(
 
     if force:
         os.environ["SPACEAX_FORCE"] = "1"
-        print("\n   ⚡ Mode --force: tier/ukuran tidak diturunkan, early stopping dimatikan.\n")
+        print(
+            "\n   ⚡ Mode --force: tier tidak diturunkan, early stopping dimatikan, "
+            "ProMax 8B memakai VRAM-fit (seq/batch disesuaikan GPU).\n"
+        )
 
     from core.config import get_config
     from core.tokenizer import BPETokenizer
-    from core.model import SpaceaxModel
     from core.kbbi import KBBIVocabulary
 
     if promax_tier:
@@ -61,6 +64,11 @@ def train_cmd(
         tc.batch_size = max(1, batch_size)
     if grad_accum is not None:
         tc.gradient_accumulation_steps = max(1, grad_accum)
+
+    if promax_tier == "promax_8b":
+        from core.vram_fit import clamp_8b_after_user_overrides
+
+        clamp_8b_after_user_overrides(config["model"], tc)
     eff_batch = tc.batch_size * tc.gradient_accumulation_steps
     print(
         f"\n   📊 Batch: {tc.batch_size} × accum {tc.gradient_accumulation_steps} "
@@ -215,8 +223,27 @@ def train_cmd(
     if 'data' in locals(): del data
     gc.collect()
 
+    mc = config["model"]
+    tier = config.get("promax_tier") or config.get("profile_name", "?")
     print(f"\n🏗️  Inisialisasi Model Transformer...")
-    model = SpaceaxModel(config["model"])
+    print(
+        f"   Profil: {tier} | d_model={mc.d_model} | layers={mc.n_layers} | "
+        f"vocab={mc.vocab_size:,}"
+    )
+    if torch.cuda.is_available():
+        vram = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+        print(f"   GPU: {torch.cuda.get_device_name(0)} ({vram:.1f} GB VRAM)")
+    else:
+        print(
+            "   ⚠️  CPU saja — inisialisasi ProMax bisa 5–15 menit dan terlihat hang. "
+            "Di Colab pastikan Runtime → GPU (T4)."
+        )
+    print(
+        "   ⏳ Menyusun bobot model (1–5 menit normal di Colab; jangan Ctrl+C kecuali >10 menit)..."
+    )
+    from core.vram_fit import build_spaceax_model_vram_safe
+
+    model = build_spaceax_model_vram_safe(mc, promax_tier=promax_tier)
     param_count = model.count_parameters()
     print(f"   Parameter: {param_count:,}")
     print(f"   Ukuran estimasi: ~{param_count * 4 / (1024**2):.0f} MB (FP32)")

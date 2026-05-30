@@ -424,10 +424,17 @@ class Trainer:
         for inputs, targets in self.val_loader:
             inputs = inputs.to(self.device)
             targets = targets.to(self.device)
-            logits, _ = self.model(inputs)
-            loss = self.criterion(
-                logits.view(-1, logits.size(-1)), targets.view(-1)
-            )
+            if self.use_amp:
+                with torch.amp.autocast("cuda", dtype=self.amp_dtype):
+                    logits, _ = self.model(inputs)
+                    loss = self.criterion(
+                        logits.view(-1, logits.size(-1)), targets.view(-1)
+                    )
+            else:
+                logits, _ = self.model(inputs)
+                loss = self.criterion(
+                    logits.view(-1, logits.size(-1)), targets.view(-1)
+                )
             total_loss += loss.item()
             num_batches += 1
 

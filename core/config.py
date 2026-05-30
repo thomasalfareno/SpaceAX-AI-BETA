@@ -311,9 +311,11 @@ def get_config(auto_detect: bool = True, size_override: str = None, force: bool 
             print(f"      Batch Size disesuaikan: {old_batch} → {training_cfg.batch_size}")
             print(f"      Gradient Accumulation Steps: {training_cfg.gradient_accumulation_steps}")
         else:
-            # GPU VRAM Optimization
             vram = get_gpu_vram_gb()
-            if vram > 0:
+            if promax_tier == "promax_8b":
+                from core.vram_fit import apply_promax_8b_vram_fit
+                apply_promax_8b_vram_fit(model_cfg, training_cfg, vram)
+            elif vram > 0:
                 if vram >= 75.0:
                     multiplier = 8
                 elif vram >= 38.0:
@@ -322,13 +324,20 @@ def get_config(auto_detect: bool = True, size_override: str = None, force: bool 
                     multiplier = 2
                 else:
                     multiplier = 1
-                
+
                 if multiplier > 1:
                     old_batch = training_cfg.batch_size
                     training_cfg.batch_size = old_batch * multiplier
                     old_accum = training_cfg.gradient_accumulation_steps
-                    training_cfg.gradient_accumulation_steps = max(1, old_accum // multiplier)
-                    print(f"   ⚡ GPU VRAM Terdeteksi: {vram:.1f} GB. Menaikkan Batch Size: {old_batch} → {training_cfg.batch_size} (Accumulation: {old_accum} → {training_cfg.gradient_accumulation_steps})")
+                    training_cfg.gradient_accumulation_steps = max(
+                        1, old_accum // multiplier
+                    )
+                    print(
+                        f"   ⚡ GPU VRAM Terdeteksi: {vram:.1f} GB. "
+                        f"Menaikkan Batch Size: {old_batch} → {training_cfg.batch_size} "
+                        f"(Accumulation: {old_accum} → "
+                        f"{training_cfg.gradient_accumulation_steps})"
+                    )
         
         # Tentukan optimizer_type otomatis
         total_ram = get_system_ram_gb()

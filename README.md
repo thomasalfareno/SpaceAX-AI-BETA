@@ -280,11 +280,30 @@ Simpan checkpoint ke Drive:
 !cp data/checkpoints/model_best.pt "/content/drive/MyDrive/SpaceAX/checkpoints/"
 ```
 
-Untuk **promax_8b** di Colab: hanya masuk akal di runtime A100 40GB+; pakai `--force` jika Anda sadar risiko OOM:
+### ProMax 8B di Colab (A100 40 GB+)
+
+**Jangan** di runtime T4 (15 GB VRAM) — akan macet/OOM di `Inisialisasi Model`. Pilih *Runtime → A100*.
 
 ```python
-!python main.py train --size promax --promax-tier promax_8b --epochs 40 --force --batch-size 1 --grad-accum 32
+!git clone https://github.com/thomasalfareno/SpaceAX-AI-BETA.git
+%cd SpaceAX-AI-BETA
+
+!unzip -q kbbi/ekstrak.zip -d kbbi/temp
+!mv kbbi/temp/* kbbi/
+!rm -rf kbbi/temp kbbi/ekstrak.zip
+
+!pip install -q -r requirements.txt
+!pip install -q "ddgs>=9.14.0"
+
+import torch
+print(torch.cuda.is_available(), torch.cuda.get_device_name(0))
+
+# Tes 2 epoch (chat belum pintar; naikkan epoch untuk hasil nyata)
+!python main.py train --size promax --promax-tier promax_8b --epochs 2 --batch-size 1 --grad-accum 16 --regen --force
 ```
+
+`--force` = tier **tetap 8B** (tidak downgrade), early stopping mati, plus **VRAM-fit** otomatis (`seq_len` / batch / bobot bf16 disesuaikan GPU).  
+`--epochs 2` hanya untuk cek pipeline jalan; chat baru enak setelah puluhan epoch.
 
 ---
 
@@ -426,7 +445,7 @@ atau:
 python main.py train --size promax --promax-tier promax_8b --force
 ```
 
-**`--force` penting untuk 8B di mesin lemah:** sistem tidak menurunkan tier dan tidak menghentikan training lebih awal karena early stopping. Training bisa gagal OOM — itu risiko yang Anda pilih.
+**`--force` + ProMax 8B:** tier tidak diturunkan; **VRAM-fit** menyesuaikan `max_seq_len`, batch, grad accum, dan (jika VRAM &lt; 40 GB) bobot **bfloat16** agar memakai GPU semaksimal mungkin tanpa OOM. Di T4 (15 GB) seq_len bisa turun ke 256–384 — masih 8B arsitektur, bukan tier lebih kecil.
 
 Checkpoint **tidak** bisa dipakai antar tier (ukuran layer & vocab beda).
 
@@ -496,6 +515,25 @@ pip install "ddgs>=9.14.0"
 ```
 
 Pastikan venv aktif: `which python` → path ke `.venv`.
+
+### Macet di `🏗️ Inisialisasi Model Transformer...` (Colab)
+
+Bukan error — PyTorch sedang **mengalokasikan bobot** (embedding + puluhan layer). Tidak ada progress bar, jadi terlihat hang.
+
+- **Jangan Ctrl+C** dulu; ProMax 1B di Colab T4 biasanya **1–5 menit** di baris itu.
+- Pastikan runtime **GPU**: menu *Runtime → Change runtime type → T4 GPU*.
+- Cek di notebook: `import torch; print(torch.cuda.is_available())` → harus `True`.
+- `promax_8b` di Colab T4: pakai `--force` (VRAM-fit otomatis); seq_len disesuaikan (~256–384). Untuk hasil lebih stabil, A100 40 GB+ lebih disarankan. Alternatif ringan:
+
+```bash
+!python main.py train --size promax --promax-tier promax_1b --epochs 30 --regen
+```
+
+Atau lebih ringan untuk uji cepat:
+
+```bash
+!python main.py train --size medium --epochs 20 --regen
+```
 
 ### CUDA OOM
 
