@@ -3,6 +3,6 @@ beautifulsoup4
 duckduckgo-search
 ddgs
 rich
-git+https://github.com/huggingface/tokenizers.git#subdirectory=bindings/python
+tokenizers
 requests
 numpy
