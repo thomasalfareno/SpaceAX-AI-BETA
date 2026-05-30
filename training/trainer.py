@@ -237,10 +237,14 @@ class Trainer:
             else None
         )
 
-        # Early stopping state
         self.best_val_loss = float("inf")
         self.patience_counter = 0
-        self.patience = 3
+        self.force_train = getattr(config, "force_train", False)
+        self.patience = (
+            config.num_epochs
+            if self.force_train
+            else getattr(config, "early_stopping_patience", 5)
+        )
 
         self.step = 0
         self.checkpoint_meta = {}
@@ -509,7 +513,10 @@ class Trainer:
         print(f"   Batches per epoch: {len(self.train_loader)}")
         print(f"   Total optimizer steps: {self.total_steps}")
         print(f"   Warmup steps: {getattr(self.config, 'warmup_steps', 300)}")
-        print(f"   Early stopping patience: {self.patience}")
+        if self.force_train:
+            print("   Early stopping: NONAKTIF (--force, semua epoch dijalankan)")
+        else:
+            print(f"   Early stopping patience: {self.patience}")
         if self.tokenizer:
             print(f"   Sample generation: aktif ({len(self.SAMPLE_PROMPTS)} prompts)")
         print()
@@ -575,8 +582,7 @@ class Trainer:
 
             print(f"{'=' * 55}\n")
 
-            # ---- Early stopping trigger ----
-            if self.patience_counter >= self.patience:
+            if not self.force_train and self.patience_counter >= self.patience:
                 print(
                     f"⏹️  Early stopping! Training dihentikan pada epoch {epoch}."
                 )

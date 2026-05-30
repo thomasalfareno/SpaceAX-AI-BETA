@@ -20,7 +20,7 @@ PROMAX_TIERS = {
         "n_layers": 28,
         "d_ff": 6144,
         "max_seq_len": 1024,
-        "vocab_size": 64000,
+        "vocab_size": 96000,
         "batch_size": 1,
         "min_ram_gb": 48.0,
         "label": "PROMAX 1.2B — Tier Dasar",
@@ -31,7 +31,7 @@ PROMAX_TIERS = {
         "n_layers": 36,
         "d_ff": 10240,
         "max_seq_len": 1024,
-        "vocab_size": 96000,
+        "vocab_size": 128000,
         "batch_size": 1,
         "min_ram_gb": 64.0,
         "label": "PROMAX ~4B — Tier Canggih",
@@ -42,7 +42,7 @@ PROMAX_TIERS = {
         "n_layers": 40,
         "d_ff": 14336,
         "max_seq_len": 1024,
-        "vocab_size": 128000,
+        "vocab_size": 160000,
         "batch_size": 1,
         "min_ram_gb": 96.0,
         "label": "PROMAX ~8B — Tier Tertinggi",
@@ -54,6 +54,7 @@ def resolve_promax_tier(
     total_ram: float | None = None,
     vram_gb: float | None = None,
     force_tier: str | None = None,
+    hardware_force: bool = False,
 ) -> str:
     """
     Pilih sub-tier ProMax.
@@ -64,10 +65,14 @@ def resolve_promax_tier(
         need = PROMAX_TIERS[force_tier]["min_ram_gb"]
         vram = vram_gb if vram_gb is not None else get_gpu_vram_gb()
         if ram < need:
-            print(
-                f"   ⚠️  SPACEAX_PROMAX_TIER={force_tier}: RAM {ram:.1f} GB "
+            msg = (
+                f"   ⚠️  Tier {force_tier}: RAM {ram:.1f} GB "
                 f"< rekomendasi {need:.0f} GB — risiko OOM / swap lambat."
             )
+            if hardware_force:
+                print(msg + " (--force: training tetap dilanjutkan.)")
+            else:
+                print(msg)
         if force_tier == "promax_4b" and 0 < vram < 24:
             print(
                 f"   ⚠️  VRAM {vram:.1f} GB: 4B biasanya butuh ≥24 GB (L4/A10) "
@@ -106,12 +111,13 @@ def get_promax_profile(tier: str) -> dict:
 
 
 def apply_promax_training_overrides(training_cfg) -> None:
-    """Hyperparameter khusus tier ProMax — lebih sabar & stabil."""
+    """Hyperparameter khusus tier ProMax."""
     training_cfg.num_epochs = max(training_cfg.num_epochs, 30)
     training_cfg.warmup_steps = max(training_cfg.warmup_steps, 2000)
-    training_cfg.early_stopping_patience = max(
-        getattr(training_cfg, "early_stopping_patience", 5), 7
-    )
+    if not getattr(training_cfg, "force_train", False):
+        training_cfg.early_stopping_patience = max(
+            getattr(training_cfg, "early_stopping_patience", 5), 7
+        )
     training_cfg.learning_rate = min(training_cfg.learning_rate, 2e-4)
     training_cfg.gradient_accumulation_steps = max(
         training_cfg.gradient_accumulation_steps, 16

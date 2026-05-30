@@ -53,6 +53,16 @@ def get_available_ram_gb() -> float:
         pass
     return 2.0
 
+def is_force_mode() -> bool:
+    """Paksa tier/ukuran model dan nonaktifkan early stopping (--force / SPACEAX_FORCE)."""
+    return os.environ.get("SPACEAX_FORCE", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
+
+
 def get_gpu_vram_gb() -> float:
     """Deteksi total memori VRAM GPU dalam GB."""
     if torch.cuda.is_available():
@@ -69,41 +79,39 @@ def get_gpu_vram_gb() -> float:
 MODEL_PROFILES = {
     "small": {
         "d_model": 384, "n_heads": 6, "n_layers": 6,
-        "d_ff": 1536, "max_seq_len": 512, "vocab_size": 64000,
+        "d_ff": 1536, "max_seq_len": 512, "vocab_size": 72000,
         "batch_size": 16, "label": "SMALL (~25M params)",
         "min_ram_gb": 4.0,
     },
     "medium": {
         "d_model": 768, "n_heads": 12, "n_layers": 12,
-        "d_ff": 3072, "max_seq_len": 1024, "vocab_size": 64000,
+        "d_ff": 3072, "max_seq_len": 1024, "vocab_size": 96000,
         "batch_size": 8, "label": "MEDIUM (~100M params)",
         "min_ram_gb": 8.0,
     },
     "large": {
         "d_model": 1024, "n_heads": 16, "n_layers": 16,
-        "d_ff": 4096, "max_seq_len": 1024, "vocab_size": 64000,
+        "d_ff": 4096, "max_seq_len": 1024, "vocab_size": 96000,
         "batch_size": 4, "label": "LARGE (~250M params)",
         "min_ram_gb": 16.0,
     },
     "ultra": {
         "d_model": 1280, "n_heads": 20, "n_layers": 24,
-        "d_ff": 5120, "max_seq_len": 1024, "vocab_size": 64000,
+        "d_ff": 5120, "max_seq_len": 1024, "vocab_size": 128000,
         "batch_size": 2, "label": "ULTRA (~650M params)",
         "min_ram_gb": 32.0,
     },
     # Alias — sub-tier dipilih di auto_model_config via core.promax
     "promax": {
         "d_model": 1536, "n_heads": 24, "n_layers": 28,
-        "d_ff": 6144, "max_seq_len": 1024, "vocab_size": 64000,
+        "d_ff": 6144, "max_seq_len": 1024, "vocab_size": 96000,
         "batch_size": 1, "label": "PROMAX (auto-tier 1B/4B/8B)",
         "min_ram_gb": 48.0,
     },
 }
 
-def auto_model_config(size_override: str = None):
+def auto_model_config(size_override: str = None, force: bool = False):
     """Pilih konfigurasi model otomatis berdasarkan RAM atau override manual."""
-    from core.debug_log import agent_log
-
     total_ram = get_system_ram_gb()
     avail_ram = get_available_ram_gb()
     vram_gb = get_gpu_vram_gb()
@@ -135,36 +143,42 @@ def auto_model_config(size_override: str = None):
     promax_tier = None
     if profile_name == "promax":
         from core.promax import resolve_promax_tier, get_promax_profile
-        force = os.environ.get("SPACEAX_PROMAX_TIER")
-        promax_tier = resolve_promax_tier(total_ram, vram_gb, force_tier=force)
-        profile = get_promax_profile(promax_tier)
-        # #region agent log
-        agent_log(
-            "config.py:auto_model_config",
-            "promax_tier_resolved",
-            {
-                "tier": promax_tier,
-                "total_ram_gb": round(total_ram, 2),
-                "vram_gb": round(vram_gb, 2),
-                "est_params": profile.get("est_params"),
-                "vocab_size": profile.get("vocab_size"),
-                "size_override": size_override,
-            },
-            hypothesis_id="H1",
+        hw_force = force or is_force_mode()
+        tier_override = os.environ.get("SPACEAX_PROMAX_TIER")
+        promax_tier = resolve_promax_tier(
+            total_ram,
+            vram_gb,
+            force_tier=tier_override,
+            hardware_force=hw_force,
         )
-        # #endregion
+        profile = get_promax_profile(promax_tier)
+        if hw_force and total_ram < profile["min_ram_gb"]:
+            print(
+                f"   ⚡ --force: tetap memakai {promax_tier} "
+                f"(RAM {total_ram:.1f} GB < rekomendasi {profile['min_ram_gb']:.0f} GB)."
+            )
     else:
         profile = MODEL_PROFILES[profile_name]
 
-    # Warn jika RAM mungkin tidak cukup (hanya jika auto-detect, bukan manual override)
-    if not size_override and total_ram < profile["min_ram_gb"]:
-        print(f"   ⚠️  RAM mungkin tidak cukup untuk profil {profile_name.upper()} "
-              f"(butuh {profile['min_ram_gb']}GB, punya {total_ram:.1f}GB)")
-        print(f"   ⚠️  Menurunkan ke profil yang lebih kecil...")
+    hw_force = force or is_force_mode()
+    if (
+        not hw_force
+        and not size_override
+        and total_ram < profile["min_ram_gb"]
+    ):
+        print(
+            f"   ⚠️  RAM mungkin tidak cukup untuk profil {profile_name.upper()} "
+            f"(butuh {profile['min_ram_gb']}GB, punya {total_ram:.1f}GB)"
+        )
+        print("   ⚠️  Menurunkan ke profil yang lebih kecil... (pakai --force untuk memaksa)")
         for pname in ["small", "medium", "large", "ultra", "promax"]:
             if total_ram >= MODEL_PROFILES[pname]["min_ram_gb"]:
                 profile_name = pname
                 profile = MODEL_PROFILES[pname]
+                if profile_name == "promax":
+                    from core.promax import resolve_promax_tier, get_promax_profile
+                    promax_tier = resolve_promax_tier(total_ram, vram_gb, force_tier=None)
+                    profile = get_promax_profile(promax_tier)
 
     cfg = ModelConfig(
         d_model=profile["d_model"],
@@ -196,7 +210,7 @@ class ModelConfig:
     n_layers: int = 12
     d_ff: int = 3072
     max_seq_len: int = 512
-    vocab_size: int = 64000
+    vocab_size: int = 96000
     dropout: float = 0.1
     rope_theta: float = 10000.0
     use_gradient_checkpointing: bool = False
@@ -216,8 +230,8 @@ class TrainingConfig:
     use_bfloat16_cpu: bool = False
     num_workers: int = 0
     optimizer_type: str = "adamw"  # "adamw" atau "adafactor"
-    # Early stopping
-    early_stopping_patience: int = 5  # Lebih sabar sebelum berhenti
+    early_stopping_patience: int = 5
+    force_train: bool = False
 
 @dataclass
 class PathConfig:
@@ -260,7 +274,7 @@ class EmotionConfig:
     default_emotion: str = "neutral"
     decay_rate: float = 0.05
 
-def get_config(auto_detect: bool = True, size_override: str = None):
+def get_config(auto_detect: bool = True, size_override: str = None, force: bool = False):
     """Dapatkan semua config sekaligus.
     
     Args:
@@ -271,10 +285,11 @@ def get_config(auto_detect: bool = True, size_override: str = None):
     paths.ensure_dirs()
 
     if auto_detect:
+        force = force or is_force_mode()
         model_cfg, batch_size, label, promax_tier, profile_name = auto_model_config(
-            size_override
+            size_override, force=force
         )
-        training_cfg = TrainingConfig(batch_size=batch_size)
+        training_cfg = TrainingConfig(batch_size=batch_size, force_train=force)
 
         if promax_tier or size_override == "promax":
             from core.promax import apply_promax_training_overrides

@@ -30,12 +30,17 @@ def train_cmd(
     promax_tier=None,
     batch_size=None,
     grad_accum=None,
+    force=False,
 ):
     print("=" * 60)
     print("🧠 SpaceAx AI — Training Pipeline v2")
     print("   Oleh: Thomas Alfareno Ananta Nugraha — ITS Surabaya")
     print("=" * 60)
     ensure_setup()
+
+    if force:
+        os.environ["SPACEAX_FORCE"] = "1"
+        print("\n   ⚡ Mode --force: tier/ukuran tidak diturunkan, early stopping dimatikan.\n")
 
     from core.config import get_config
     from core.tokenizer import BPETokenizer
@@ -47,7 +52,7 @@ def train_cmd(
         if not size_override:
             size_override = "promax"
 
-    config = get_config(auto_detect=True, size_override=size_override)
+    config = get_config(auto_detect=True, size_override=size_override, force=force)
     is_promax = config.get("is_promax", False)
     promax_tier = config.get("promax_tier")
 
@@ -98,30 +103,41 @@ def train_cmd(
     # 2. Enrich with KBBI training data (if not already added)
     # ====================================================================
     kbbi_dir = config["paths"].kbbi_dir
+    kbbi = None
     if os.path.exists(kbbi_dir):
-        # Cek apakah sudah ada data KBBI
-        has_kbbi = any(c.get("topic", "").startswith("kbbi") 
-                       for c in seed_data.get("conversations", [])[:100])
-        
-        if not has_kbbi or regen_data:
-            print("\n📚 Menghasilkan training data dari KBBI...")
+        need_kbbi = regen_data or KBBIVocabulary.should_refresh_seed(
+            seed_file, kbbi_dir
+        )
+        if need_kbbi:
+            print("\n📚 Menyinkronkan seed dengan KBBI + leksikon (txt/json)...")
             kbbi = KBBIVocabulary(kbbi_dir)
             kbbi.load()
-            
-            kbbi_cap = 800 if is_promax else 1200
-            kbbi_pairs = kbbi.generate_rich_training_data(max_pairs=kbbi_cap)
+
+            seed_data["conversations"] = KBBIVocabulary.strip_kbbi_topics(
+                seed_data.get("conversations", [])
+            )
+
+            if is_promax:
+                def_cap, slang_cap, lex_cap = 4500, 2000, 1200
+            else:
+                def_cap, slang_cap, lex_cap = 7000, 2800, 2000
+
+            kbbi_pairs = kbbi.enrich_all_training_data(
+                max_def_pairs=def_cap,
+                max_slang_pairs=slang_cap,
+                max_lexicon_pairs=lex_cap,
+            )
             if kbbi_pairs:
                 seed_data["conversations"].extend(kbbi_pairs)
                 seed_data["total"] = len(seed_data["conversations"])
-                
                 with open(seed_file, "w", encoding="utf-8") as f:
                     json.dump(seed_data, f, ensure_ascii=False, indent=2)
-                
-                print(f"   ✅ {len(kbbi_pairs):,} KBBI pairs ditambahkan")
-                print(f"   📊 Total dataset sekarang: {seed_data['total']:,}")
+                print(f"   ✅ +{len(kbbi_pairs):,} pasangan KBBI/leksikon")
+                print(f"   📊 Total dataset: {seed_data['total']:,}")
+        else:
+            print("   📚 KBBI seed sudah sinkron (pakai --regen atau SPACEAX_KBBI_SYNC=1 untuk paksa)")
     else:
         print(f"⚠️ Direktori KBBI tidak ditemukan: {kbbi_dir}")
-        kbbi = None
 
     # Variasi komposisi (intent → banyak susunan kata, anti-hafalan contoh)
     from training.composition_variants import augment_dataset_dict
@@ -132,7 +148,7 @@ def train_cmd(
     )
     if not has_compose or regen_data:
         compose_n = augment_dataset_dict(
-            seed_data, max_per_intent=12 if is_promax else 8
+            seed_data, max_per_intent=24 if is_promax else 18
         )
         if compose_n:
             with open(seed_file, "w", encoding="utf-8") as f:
@@ -142,26 +158,12 @@ def train_cmd(
     # ProMax: perkuat sampel percakapan + emosi (bukan dominasi KBBI)
     if is_promax:
         from training.generate_seed_data import gen_emotions
-        from core.debug_log import agent_log
-
         emotion_extra = gen_emotions()
         seed_data["conversations"].extend(emotion_extra)
         seed_data["total"] = len(seed_data["conversations"])
         with open(seed_file, "w", encoding="utf-8") as f:
             json.dump(seed_data, f, ensure_ascii=False, indent=2)
         print(f"   🏆 ProMax: +{len(emotion_extra)} sampel emosi/konversasi ditambahkan")
-        # #region agent log
-        agent_log(
-            "main.py:train_cmd",
-            "promax_seed_boost",
-            {
-                "emotion_samples_added": len(emotion_extra),
-                "total_conversations": seed_data["total"],
-                "tier": promax_tier,
-            },
-            hypothesis_id="H3",
-        )
-        # #endregion
 
     # ====================================================================
     # 3. Train tokenizer (dengan KBBI corpus)
@@ -185,9 +187,12 @@ def train_cmd(
             print("   📚 Menambahkan corpus KBBI ke tokenizer...")
             kbbi_obj = KBBIVocabulary(kbbi_dir)
             kbbi_obj.load()
-            kbbi_corpus = kbbi_obj.generate_corpus()
+            kbbi_corpus = kbbi_obj.generate_corpus(max_chars=14_000_000)
             corpus += " " + kbbi_corpus
-            print(f"   📊 Total corpus: {len(corpus):,} karakter")
+            print(
+                f"   📊 Corpus gabungan: {len(corpus):,} karakter "
+                f"(termasuk {len(kbbi_obj.words):,} kata leksikon)"
+            )
         
         tokenizer.train(corpus)
         tokenizer.save(config["paths"].vocab_dir)
@@ -309,12 +314,13 @@ def retrain_cmd(
     promax_tier=None,
     batch_size=None,
     grad_accum=None,
+    force=False,
 ):
     """Retrain model dengan data baru dari percakapan."""
     print("🔄 Auto-retrain dengan data percakapan baru...")
     ensure_setup()
     from core.config import get_config
-    config = get_config(auto_detect=True, size_override=size_override)
+    config = get_config(auto_detect=True, size_override=size_override, force=force)
 
     log_file = os.path.join(config["paths"].data_dir, "conversation_logs", "chat_history.json")
     seed_file = os.path.join(config["paths"].seed_dir, "conversations.json")
@@ -365,6 +371,7 @@ def retrain_cmd(
         promax_tier=promax_tier,
         batch_size=batch_size,
         grad_accum=grad_accum,
+        force=force,
     )
 
 def test_cmd():
@@ -430,6 +437,11 @@ if __name__ == "__main__":
                     help="Override gradient accumulation steps")
     tp.add_argument("--regen", action="store_true",
                     help="Regenerasi seed data dan tokenizer dari awal")
+    tp.add_argument(
+        "--force",
+        action="store_true",
+        help="Paksa tier/ukuran walau RAM/VRAM kurang; nonaktifkan early stopping",
+    )
 
     # Chat command
     cp = sub.add_parser("chat", help="Mulai ngobrol dengan SpaceAx AI")
@@ -459,6 +471,11 @@ if __name__ == "__main__":
     )
     rp.add_argument("--batch-size", type=int, default=None)
     rp.add_argument("--grad-accum", type=int, default=None)
+    rp.add_argument(
+        "--force",
+        action="store_true",
+        help="Sama seperti train --force",
+    )
 
     lp = sub.add_parser("learn", help="Suruh AI belajar dari internet")
     lp.add_argument("topic", type=str, help="Topik yang ingin dipelajari")
@@ -476,6 +493,7 @@ if __name__ == "__main__":
             promax_tier=getattr(args, "promax_tier", None),
             batch_size=getattr(args, "batch_size", None),
             grad_accum=getattr(args, "grad_accum", None),
+            force=getattr(args, "force", False),
         )
     elif args.command == "chat":
         chat_cmd(
@@ -494,6 +512,7 @@ if __name__ == "__main__":
             promax_tier=getattr(args, "promax_tier", None),
             batch_size=getattr(args, "batch_size", None),
             grad_accum=getattr(args, "grad_accum", None),
+            force=getattr(args, "force", False),
         )
     elif args.command == "test":
         test_cmd()

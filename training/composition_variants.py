@@ -41,6 +41,21 @@ _INTENTS: Dict[str, List[str]] = {
         "Perasaanmu valid. Mau curhat lebih jauh?",
         "Peluk virtual dulu — kamu nggak sendirian.",
     ],
+    "goodbye": [
+        "Sampai jumpa! Semoga harimu menyenangkan.",
+        "Dadah! Kalau butuh lagi, aku di sini.",
+        "Bye! Senang ngobrol sama kamu.",
+    ],
+    "confirm": [
+        "Siap, noted! Lanjut ke langkah berikutnya ya.",
+        "Oke, aku paham maksudmu.",
+        "Betul, kita sepakat di situ.",
+    ],
+    "apology": [
+        "Nggak apa-apa, santai saja.",
+        "Gapapa kok, kita coba cara lain.",
+        "Maaf kalau tadi kurang jelas — aku perbaiki penjelasannya.",
+    ],
 }
 
 
@@ -74,6 +89,9 @@ def generate_composition_variants(max_per_intent: int = 12) -> List[dict]:
         "thanks": ["makasih", "terima kasih", "thanks"],
         "dont_know": ["apa itu X", "jelaskan X"],  # placeholder handled below
         "empathy": ["aku sedih", "lagi galau", "kecewa banget"],
+        "goodbye": ["dadah", "bye", "sampai jumpa", "udah dulu ya"],
+        "confirm": ["oke siap", "mantap", "setuju", "bener banget"],
+        "apology": ["maaf ya", "sorry", "aku salah"],
     }
 
     for intent, templates in _INTENTS.items():

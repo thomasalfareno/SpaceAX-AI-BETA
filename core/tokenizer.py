@@ -62,15 +62,27 @@ class BPETokenizer:
         """Latih tokenizer BPE dengan teks korpus."""
         print(f"⚡ Memulai BPE training (Rust backend)… target vocab_size: {self.target_vocab_size}")
 
+        min_freq = 1 if self.target_vocab_size >= 96000 else 2
         trainer = BpeTrainer(
             vocab_size=self.target_vocab_size,
             special_tokens=self.special_tokens_list,
-            min_frequency=2,
+            min_frequency=min_freq,
             show_progress=True,
         )
 
-        # Split text into lines/chunks — HF trainer menerima iterator of str
-        iterator = [line for line in text.split("\n") if line.strip()]
+        chunks = []
+        for line in text.split("\n"):
+            line = line.strip()
+            if not line:
+                continue
+            if len(line) > 4000:
+                for i in range(0, len(line), 2000):
+                    part = line[i : i + 2000].strip()
+                    if part:
+                        chunks.append(part)
+            else:
+                chunks.append(line)
+        iterator = chunks
 
         self.tokenizer.train_from_iterator(iterator, trainer=trainer)
 

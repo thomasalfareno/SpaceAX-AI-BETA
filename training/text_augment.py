@@ -28,6 +28,18 @@ _WORD_SWAP = {
     "nih": ["ini", "dong"],
     "dong": ["nih", "ya"],
     "ya": ["yah", "sih"],
+    "tolong": ["minta tolong", "mohon"],
+    "jelasin": ["jelaskan", "uraikan"],
+    "ngerti": ["paham", "mengerti"],
+    "kayak": ["seperti", "bagai"],
+    "gitu": ["begitu", "seperti itu"],
+    "udah": ["sudah", "telah"],
+    "belum": ["blm", "not yet"],
+    "lagi": ["sedang", "masih"],
+    "spaceax": ["space ax", "spaceax ai"],
+    "python": ["py", "bahasa python"],
+    "error": ["bug", "kesalahan"],
+    "data": ["dataset", "datanya"],
 }
 
 _OPENERS = [

@@ -660,25 +660,7 @@ class EmotionEngine:
         self._last_update = now
 
         if self.human_like_mood:
-            dom = self.state.dominant_emotion
-            if self._last_dominant is None or dom[0] != self._last_dominant[0]:
-                # #region agent log
-                try:
-                    from core.debug_log import agent_log
-                    agent_log(
-                        "emotion_engine.py:decay",
-                        "dominant_emotion_shift",
-                        {
-                            "from": self._last_dominant,
-                            "to": {"emotion": dom[0], "intensity": round(dom[1], 3)},
-                            "dt": round(dt, 2),
-                        },
-                        hypothesis_id="H4",
-                    )
-                except Exception:
-                    pass
-                # #endregion
-            self._last_dominant = dom
+            self._last_dominant = self.state.dominant_emotion
 
     # ------------------------------------------------------------------
     # Pengubah Gaya Respons

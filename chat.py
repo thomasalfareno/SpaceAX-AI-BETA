@@ -376,7 +376,7 @@ def is_valid_output(text: str) -> bool:
 
 
 def is_valid_output_relaxed(text: str) -> bool:
-    """Validator lebih longgar — dipakai saat checkpoint masih belajar (val_loss 4–6)."""
+    """Validator longgar untuk checkpoint yang masih belajar."""
     if not text or len(text.strip()) < 2:
         return False
     stripped = text.strip()
@@ -400,6 +400,22 @@ def is_valid_output_relaxed(text: str) -> bool:
     for pat in bad:
         if re.search(pat, stripped, re.IGNORECASE):
             return False
+    return True
+
+
+def is_valid_output_draft(text: str) -> bool:
+    """Validator minimal — tetap tampilkan output model meski epoch masih awal."""
+    if not text or len(text.strip()) < 3:
+        return False
+    stripped = text.strip()
+    printable = sum(1 for c in text if c.isprintable() or c in "\n\t")
+    if printable / max(len(text), 1) < 0.85:
+        return False
+    words = re.findall(r"\b\w+\b", stripped.lower())
+    if len(words) < 2:
+        return False
+    if len(stripped) > 5 and len(set(stripped.lower())) < 2:
+        return False
     return True
 
 
@@ -451,20 +467,6 @@ class TerminalChat:
                 self.model.load_state_dict(ckpt['model_state_dict'])
                 self.checkpoint_val_loss = float(ckpt.get("best_val_loss", float("inf")))
                 meta = ckpt.get("meta", {})
-                # #region agent log
-                from core.debug_log import agent_log
-                agent_log(
-                    "chat.py:_init_model",
-                    "checkpoint_loaded",
-                    {
-                        "param_count": self.model.count_parameters(),
-                        "ckpt_meta": meta,
-                        "config_promax": self.is_promax,
-                        "size_override": self.size_override,
-                    },
-                    hypothesis_id="H2",
-                )
-                # #endregion
                 if meta.get("promax_tier"):
                     self.console.print(
                         f"[cyan]   🏆 Checkpoint ProMax: {meta['promax_tier']} "
@@ -484,8 +486,8 @@ class TerminalChat:
                     )
                 else:
                     self.console.print(
-                        f"[yellow]   📉 Checkpoint masih mentah: val_loss={self.checkpoint_val_loss:.3f}. "
-                        f"Chat memakai fallback cerdas + memori konteks; lanjutkan training "
+                        f"[yellow]   📉 Checkpoint masih awal: val_loss={self.checkpoint_val_loss:.3f}. "
+                        f"Model tetap dicoba (mode draft); lanjutkan training "
                         f"(ProMax: ≥30 epoch, target val_loss < 3.5).[/]"
                     )
             except Exception as e:
@@ -511,20 +513,6 @@ class TerminalChat:
             max_history=200,
             human_like_mood=self.is_promax,
         )
-        # #region agent log
-        from core.debug_log import agent_log
-        agent_log(
-            "chat.py:_init_systems",
-            "emotion_engine_init",
-            {
-                "is_promax": self.is_promax,
-                "decay_rate": emo_decay,
-                "sensitivity": emo_sens,
-                "human_like_mood": self.is_promax,
-            },
-            hypothesis_id="H4",
-        )
-        # #endregion
         self.internet = InternetLearner(self.paths.knowledge_dir)
 
         os.makedirs(self.paths.personality_dir, exist_ok=True)
@@ -781,19 +769,23 @@ class TerminalChat:
         return "raw"
 
     def _try_transformer_response(
-        self, user_text: str, dominant_emo: str, *, strict: bool = True
+        self,
+        user_text: str,
+        dominant_emo: str,
+        *,
+        validator: str = "strict",
     ):
-        """Generate via model; strict=False memakai validator lebih longgar."""
+        """Generate via model. validator: strict | relaxed | draft."""
         if not (self.model_trained and self.tokenizer):
             return None
 
         tier = self._model_val_loss_tier()
-        if tier == "raw":
-            return None
-        if strict and tier not in ("mature", "learning"):
-            return None
-        if not strict and tier == "raw":
-            return None
+        validators = {
+            "strict": is_valid_output,
+            "relaxed": is_valid_output_relaxed,
+            "draft": is_valid_output_draft,
+        }
+        check = validators.get(validator, is_valid_output)
 
         try:
             eos_id = self.tokenizer.special_tokens.get("<EOS>", 2)
@@ -801,9 +793,12 @@ class TerminalChat:
             gen_cfg = getattr(self, "_promax_gen", {"max_gen_len": 120, "temperature": 0.75})
             temp = gen_cfg["temperature"]
             if tier == "learning":
-                temp = min(0.85, temp + 0.05)
-            elif tier == "early":
-                temp = min(0.9, temp + 0.1)
+                temp = min(0.88, temp + 0.06)
+            elif tier in ("early", "raw"):
+                temp = min(0.95, temp + 0.12)
+
+            if validator == "draft":
+                temp = min(1.0, temp + 0.05)
 
             with torch.no_grad():
                 output_ids = self.model.generate(
@@ -819,28 +814,32 @@ class TerminalChat:
                 if sp not in ["<pikir>", "</pikir>"]:
                     raw = raw.replace(sp, "")
             raw = raw.strip()
-            min_len = 8 if not strict else 10
-            check = is_valid_output if strict else is_valid_output_relaxed
+            min_len = {"strict": 10, "relaxed": 6, "draft": 4}[validator]
             if check(raw) and len(raw) >= min_len:
                 if "<pikir>" in raw:
                     return raw
-                return (
-                    "<pikir>Merangkai respons dari pola yang dipelajari, bukan salinan contoh...</pikir>"
-                    + raw
-                )
+                if tier in ("mature", "learning"):
+                    thought = (
+                        "<pikir>Merangkai dari pola yang sudah dilatih...</pikir>"
+                    )
+                else:
+                    thought = (
+                        "<pikir>Output model masih awal (lanjutkan training untuk "
+                        f"hasil lebih halus; val_loss={self.checkpoint_val_loss:.2f})...</pikir>"
+                    )
+                return thought + raw
         except Exception:
             pass
         return None
 
     def _compose_chat_response(self, user_text: str, dominant_emo: str) -> str:
-        """Prioritas: model (ketat → longgar) → fallback percakapan."""
-        model_response = self._try_transformer_response(user_text, dominant_emo, strict=True)
-        if not model_response:
+        """Prioritas: generasi model (ketat → longgar → draft) lalu fallback."""
+        for mode in ("strict", "relaxed", "draft"):
             model_response = self._try_transformer_response(
-                user_text, dominant_emo, strict=False
+                user_text, dominant_emo, validator=mode
             )
-        if model_response:
-            return model_response
+            if model_response:
+                return model_response
         return self.resolve_conversational_response(user_text)
 
     def _respond_from_knowledge(self, user_text: str, dominant_emo: str) -> str | None:
@@ -1468,7 +1467,8 @@ class TerminalChat:
                 word = m.group(1).strip()
                 try:
                     kbbi = get_kbbi()
-                    defs = kbbi.get_all_definitions(word)
+                    w = word.lower().strip()
+                    defs = kbbi.get_all_definitions(w)
                     if defs:
                         thought = f"<pikir>Mencari definisi kata '{word}' di kamus internal...</pikir>"
                         if len(defs) == 1:
@@ -1481,6 +1481,19 @@ class TerminalChat:
                                 thought
                                 + f"Kata '{word}' memiliki {len(defs)} makna:\n{defs_text}"
                             )
+                        self.memory.process_turn("ai", response, dominant_emo)
+                        self._auto_learn(user_text, response)
+                        return response
+                    slang_meaning = kbbi.slang_to_formal.get(w)
+                    if slang_meaning:
+                        thought = (
+                            f"<pikir>Mencari padanan gaul '{word}' di leksikon slang...</pikir>"
+                        )
+                        response = (
+                            thought
+                            + f"'{word}' dalam bahasa santai biasanya berarti **{slang_meaning}**. "
+                            f"Kalau tulis formal, pakai: {slang_meaning}."
+                        )
                         self.memory.process_turn("ai", response, dominant_emo)
                         self._auto_learn(user_text, response)
                         return response

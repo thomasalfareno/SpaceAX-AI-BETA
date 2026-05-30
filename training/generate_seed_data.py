@@ -194,7 +194,7 @@ def gen_math():
         f"<pikir>{{a}} {{op}} {{b}} = {{result}}</pikir>Hasil dari {{a}} {{op}} {{b}} adalah {{result}} 📐"
     ]
     
-    for _ in range(800):  # Increased from 400
+    for _ in range(1200):
         a = random.randint(1, 999)
         b = random.randint(1, 999)
         sym, name, func = random.choice(ops)
@@ -214,7 +214,7 @@ def gen_math():
         "{a} bagi {b} berapa?", "tolong bagi {a} dengan {b}",
         "kalo {a} dibagi {b} dapetnya berapa?"
     ]
-    for _ in range(200): # Increased
+    for _ in range(350):
         b = random.randint(1, 50)
         result = random.randint(1, 50)
         a = b * result
@@ -293,7 +293,7 @@ def gen_math():
         convs.append(_entry(q, r, "neutral", "kalkulus_turunan"))
     
     # Turunan dengan koefisien: d/dx[ax^n] = a*n*x^(n-1)
-    for _ in range(100):
+    for _ in range(220):
         a = random.randint(2, 12)
         n = random.randint(2, 8)
         expr = f"{a}x^{n}"
@@ -305,7 +305,7 @@ def gen_math():
         convs.append(_entry(q, r, "neutral", "kalkulus_turunan"))
 
     # Turunan polinomial: ax^m + bx^n + c
-    for _ in range(100):
+    for _ in range(220):
         a = random.randint(1, 10)
         m = random.randint(2, 5)
         b = random.randint(1, 10)
@@ -400,7 +400,7 @@ def gen_math():
         convs.append(_entry(q, r, "neutral", "kalkulus_integral"))
 
     # Integral dengan koefisien
-    for _ in range(100):
+    for _ in range(180):
         a = random.randint(2, 12)
         n = random.randint(1, 6)
         expr = f"{a}x^{n}" if n > 1 else f"{a}x"
@@ -451,7 +451,7 @@ def gen_math():
         convs.append(_entry(q, r, "neutral", "matematika"))
 
     # Statistik
-    for _ in range(50):
+    for _ in range(120):
         nums = [random.randint(1, 100) for _ in range(random.randint(3, 7))]
         mean_val = sum(nums) / len(nums)
         sorted_nums = sorted(nums)
@@ -905,7 +905,7 @@ def gen_logic():
         convs.append(_entry(q, r, "neutral", "logika"))
 
     # Perbandingan
-    for _ in range(50):
+    for _ in range(150):
         a, b = random.randint(1, 100), random.randint(1, 100)
         op = random.choice([">", "<", ">=", "<=", "==", "!="])
         result = eval(f"{a} {op} {b}")
@@ -937,12 +937,36 @@ def generate_all(output_path: str):
         ("Percakapan Santai", gen_casual),
         ("Logika & Reasoning", gen_logic),
     ]
-    
+
     for name, gen_func in generators:
         data = gen_func()
         conversations.extend(data)
         print(f"  ✅ {name}: {len(data)} pairs")
-    
+
+    from training.seed_extra import gen_semua_extra
+    extra = gen_semua_extra()
+    conversations.extend(extra)
+    print(f"  ✅ Seed tambahan (seed_extra): {len(extra)} pairs")
+
+    kbbi_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "kbbi")
+    if os.path.isdir(kbbi_dir) and os.path.isfile(
+        os.path.join(kbbi_dir, "kbbi_v_part1.json")
+    ):
+        try:
+            from core.kbbi import KBBIVocabulary
+            print("  📚 Menggabungkan KBBI + leksikon ke seed...")
+            kv = KBBIVocabulary(kbbi_dir)
+            kv.load()
+            kbbi_rows = kv.enrich_all_training_data(
+                max_def_pairs=3500,
+                max_slang_pairs=1800,
+                max_lexicon_pairs=1000,
+            )
+            conversations.extend(kbbi_rows)
+            print(f"  ✅ KBBI/leksikon: {len(kbbi_rows)} pairs")
+        except Exception as e:
+            print(f"  ⚠️ KBBI seed dilewati: {e}")
+
     # Shuffle untuk variasi
     random.seed(42)
     random.shuffle(conversations)
