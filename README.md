@@ -1,76 +1,69 @@
-<!-- Banner Utama -->
-<p align="center">
-  <img src="assetsMD/hero_banner.svg" alt="SpaceAx AI Banner" width="900" />
-</p>
+# SpaceAx AI
 
-<!-- Badge Strip Fitur -->
-<p align="center">
-  <img src="assetsMD/features_strip.svg" alt="SpaceAx AI Features" width="850" />
-</p>
+Mesin percakapan bahasa Indonesia berbasis Transformer decoder-only, dilatih dari nol di mesin sendiri (bukan model siap pakai dari HuggingFace). Dibangun Thomas Alfareno Ananta Nugraha — Teknik Informatika FTEIC ITS Surabaya, untuk Space Ax Corp.
 
-<p align="center">
-  <a href="https://github.com/thomasalfareno/SpaceAX-AI-BETA/archive/refs/heads/main.zip">
-    <img src="https://img.shields.io/badge/Unduh_Repository_ZIP-BETA_v2.0.0-00f2fe?style=for-the-badge&logo=github&logoColor=white&labelColor=0d1117" alt="Download ZIP" />
-  </a>
-</p>
+**Repositori:** [github.com/thomasalfareno/SpaceAX-AI-BETA](https://github.com/thomasalfareno/SpaceAX-AI-BETA)
+**Versi:** 2.0.0
 
 ---
 
-## 🌌 Gambaran Singkat
+## Isi
 
-**SpaceAx AI** adalah mesin percakapan bahasa Indonesia berbasis **Transformer decoder-only**, yang dilatih dari nol di mesin lokal (bukan menggunakan model siap pakai dari HuggingFace). 
-
-Proyek ini dibangun oleh **Thomas Alfareno Ananta Nugraha** — Teknik Informatika FTEIC ITS Surabaya, untuk **Space Ax Corp**.
-
-*   **Repositori:** [github.com/thomasalfareno/SpaceAX-AI-BETA](https://github.com/thomasalfareno/SpaceAX-AI-BETA)
-*   **Versi:** 2.0.0
-
-### Alur Kerja Utama
-1.  **Clone repo** atau **Unduh ZIP**, lalu ekstrak file leksikon `kbbi/ekstrak.zip` sekali.
-2.  Install dependensi via [requirements.txt](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/requirements.txt).
-3.  Jalankan training tokenizer BPE + model via `python main.py train`.
-4.  Ngobrol interaktif via `python main.py chat`.
-5.  (Opsional) Lakukan retraining dengan riwayat chat gabungan via `python main.py retrain`.
-
----
-
-## ⚡ Demo Interaktif (Terminal)
-
-Berikut adalah simulasi proses pelatihan (training) dan interaksi chat dengan model SpaceAx AI:
-
-<p align="center">
-  <img src="assetsMD/typing_demo.svg" alt="Typing Demo" width="850" />
-</p>
+1. [Gambaran singkat](#gambaran-singkat)
+2. [Folder `kbbi/` & sinkron leksikon](#folder-kbbi--sinkron-leksikon)
+3. [Struktur folder & modul](#struktur-folder--modul)
+4. [Persyaratan](#persyaratan)
+5. [Instalasi Windows](#instalasi-windows)
+6. [Instalasi Linux](#instalasi-linux)
+7. [Google Colab](#google-colab)
+8. [Perintah CLI](#perintah-cli)
+9. [ProMax 1B / 4B / 8B](#promax-1b--4b--8b)
+10. [Ukuran vocab per profil](#ukuran-vocab-per-profil)
+11. [Training & chat: apa yang wajar diharapkan](#training--chat-apa-yang-wajar-diharapkan)
+12. [Variabel lingkungan](#variabel-lingkungan)
+13. [Masalah umum](#masalah-umum)
 
 ---
 
-## 🏗️ Arsitektur Sistem
+## Gambaran singkat
 
-SpaceAx AI mengadopsi struktur modular hibrida yang mengintegrasikan model neural Transformer dengan memori jangka panjang/pendek, modul emosi, serta pencarian internet waktu-nyata:
+Clone proyek:
 
-<p align="center">
-  <img src="assetsMD/architecture.svg" alt="Architecture Diagram" width="850" />
-</p>
+```bash
+git clone https://github.com/thomasalfareno/SpaceAX-AI-BETA.git
+cd SpaceAX-AI-BETA
+```
+
+Alur kerja biasa:
+
+1. Clone repo → **ekstrak `kbbi/ekstrak.zip` sekali** (isi JSON KBBI + leksikon txt).
+2. `pip install -r requirements.txt`
+3. `python main.py train` — latih tokenizer BPE + model, simpan checkpoint di `data/checkpoints/`.
+3. `python main.py chat` — ngobrol; model mencoba generate teks sendiri dulu, baru fallback jika output tidak layak.
+4. (Opsional) `python main.py retrain` — gabung log chat ke dataset lalu latih ulang.
+
+Fitur utama: memori percakapan (STM/LTM), mesin emosi, **KBBI + leksikon lengkap** (slang, daftar kata, kata dasar), pencarian internet (`ddgs`), augmentasi anti-hafalan, skala **ProMax** (~1.2B / ~4B / ~8B parameter), flag **`--force`** untuk training tanpa early stopping.
 
 ---
 
-## 📦 Folder `kbbi/` & Sinkronisasi Leksikon
+## Folder `kbbi/` & sinkron leksikon
 
-### Wajib Sekali: Ekstrak `ekstrak.zip`
-Di dalam direktori proyek terdapat file **`kbbi/ekstrak.zip`** (~10 MB). File JSON/txt KBBI **tidak** langsung dibaca dari zip, melainkan harus diekstrak terlebih dahulu ke folder `kbbi/` saat instalasi pertama sebelum menjalankan training.
+### Wajib sekali: ekstrak `ekstrak.zip`
 
-Setelah diekstrak, folder `kbbi/` akan berisi berkas definisi kamus seperti `kbbi_v_part1.json` hingga `part4.json`, serta daftar kata tambahan.
+Di repo ada **`kbbi/ekstrak.zip`** (~10 MB). File JSON/txt KBBI **tidak** dipakai langsung — user harus ekstrak dulu ke folder `kbbi/` (hanya saat instalasi pertama).
 
-#### Perintah Ekstraksi:
+Setelah ekstrak, `kbbi/` harus berisi antara lain `kbbi_v_part1.json` … `part4.json` dan file `.txt` leksikon. Baru jalankan `python main.py train`.
 
-##### 🐧 Linux / Google Colab:
+**Linux / Colab:**
+
 ```bash
 unzip -q kbbi/ekstrak.zip -d kbbi/temp
 mv kbbi/temp/* kbbi/
 rm -rf kbbi/temp kbbi/ekstrak.zip
 ```
 
-##### 🪟 Windows (PowerShell):
+**Windows (PowerShell):**
+
 ```powershell
 Expand-Archive -Path kbbi\ekstrak.zip -DestinationPath kbbi\temp
 Move-Item kbbi\temp\* kbbi\
@@ -78,100 +71,157 @@ Remove-Item kbbi\temp -Recurse -Force
 Remove-Item kbbi\ekstrak.zip
 ```
 
-### Daftar File Kamus & Peran:
-
-| Berkas | Fungsi / Peran |
-| :--- | :--- |
-| `ekstrak.zip` | Arsip instalasi awal kamus & leksikon (dapat dihapus setelah diekstrak). |
-| `kbbi_v_part1.json` ... `part4.json` | Definisi KBBI resmi (~112.000 entri). |
-| `indonesian-words.txt` | Daftar kata-kata bahasa Indonesia umum. |
-| `list_0.5.1.txt`, `list_1.0.0.txt` | Kumpulan kata tambahan berskala besar. |
-| `combined_slang_words.txt` | JSON pemetaan kata gaul ke baku (misal: `gw` $\rightarrow$ `saya`). |
-| `combined_root_words.txt` | Daftar kata dasar bahasa Indonesia. |
-| `combined_stop_words.txt` | Partikel atau kata henti untuk optimasi tata bahasa. |
-
-> [!NOTE]
-> **Proses Sinkronisasi**: Data kamus di atas secara otomatis akan disuntikkan ke data seed (`data/seed/conversations.json`) saat training dimulai jika berkas-berkas tersebut diperbarui. Jika ingin memaksa sinkronisasi ulang secara manual, gunakan:
-> ```bash
-> export SPACEAX_KBBI_SYNC=1
-> python main.py train --regen
-> ```
+Cek cepat: `ls kbbi/kbbi_v_part1.json` (Linux) atau `dir kbbi\kbbi_v_part1.json` (Windows).
 
 ---
 
-## 🛠️ Struktur Folder & Modul
+Semua file di `kbbi/` dipakai otomatis oleh `core/kbbi.py`:
 
-Berikut adalah pemetaan berkas kode sumber utama proyek SpaceAx AI:
+| File | Fungsi |
+|------|--------|
+| `ekstrak.zip` | Arsip instalasi — **ekstrak sekali**, lalu boleh dihapus |
+| `kbbi_v_part1.json` … `part4.json` | Definisi KBBI resmi (~112k entri) |
+| `indonesian-words.txt` | Daftar kata Indonesia |
+| `list_0.5.1.txt`, `list_1.0.0.txt` | Daftar kata tambahan (besar) |
+| `combined_slang_words.txt` | JSON gaul→baku (mis. `gw` → `saya`) |
+| `combined_root_words.txt` | Kata dasar |
+| `combined_stop_words.txt` | Partikel / stop word (kaidah tata bahasa) |
 
-*   [main.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/main.py) — CLI Utama untuk `train`, `chat`, `learn`, `retrain`, dan `test`.
-*   [chat.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/chat.py) — Antarmuka obrolan terminal + generator generasi teks.
-*   [requirements.txt](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/requirements.txt) — Dependensi paket Python yang dibutuhkan.
-*   `core/`
-    *   [core/config.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/core/config.py) — Konfigurasi profil model, pendeteksi RAM/GPU, dan parameter training.
-    *   [core/promax.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/core/promax.py) — Sub-tier arsitektur ProMax (1B / 4B / 8B).
-    *   [core/model.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/core/model.py) — Kelas `SpaceaxModel` berbasis Transformer decoder-only + RoPE.
-    *   [core/tokenizer.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/core/tokenizer.py) — Tokenizer BPE berbasis HuggingFace.
-    *   [core/kbbi.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/core/kbbi.py) — Pemuatan JSON KBBI, leksikon, slang, dan deteksi gibberish.
-    *   [core/debug_log.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/core/debug_log.py) — Log runtime jika `SPACEAX_DEBUG=1` aktif.
-*   `training/`
-    *   [training/generate_seed_data.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/training/generate_seed_data.py) — Pembuat corpus dasar `conversations.json` (kuis, logika, matematika).
-    *   [training/seed_extra.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/training/seed_extra.py) — Topik percakapan ekstra (budaya, sains, pemrograman).
-    *   [training/composition_variants.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/training/composition_variants.py) — Variasi intent agar model tidak menghafal satu struktur kalimat.
-    *   [training/text_augment.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/training/text_augment.py) — Augmentasi data teks dinamis secara on-the-fly.
-    *   [training/dataset.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/training/dataset.py) — Loader data dan augmentasi batch untuk PyTorch.
-    *   [training/trainer.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/training/trainer.py) — Loop pelatihan utama menggunakan AdamW, AMP, dan Early Stopping.
-*   `learning/`
-    *   [learning/internet.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/learning/internet.py) — Pencarian web via DuckDuckGo (`ddgs`) beserta caching.
-    *   [learning/web_learner.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/learning/web_learner.py) — Modul pengolah hasil penelusuran web untuk basis pengetahuan.
-    *   [learning/knowledge_base.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/learning/knowledge_base.py) — Database SQLite untuk penyimpanan pengetahuan terstruktur.
-    *   [learning/auto_trainer.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/learning/auto_trainer.py) — Hook retraining otomatis jika diaktifkan.
-*   `memory/`
-    *   [memory/memory.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/memory/memory.py) — Pengelola Short-Term Memory (STM) dan Long-Term Memory (LTM).
-    *   [memory/vector_store.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/memory/vector_store.py) — Pencarian kemiripan fakta / basis data vektor sederhana.
-*   `personality/`
-    *   [personality/emotion_engine.py](file:///home/gracecia/Dokumen/mdfilespaceaxaibeta/personality/emotion_engine.py) — Mesin emosi (9 status emosi dasar, decay rate, dan gaya bahasa).
+**Ke mana datanya masuk:**
+
+1. **Seed training** (`data/seed/conversations.json`) — ribuan pasangan: definisi, slang, leksikon, grammar.
+2. **Tokenizer BPE** — corpus definisi + slang + sampel kosakata (~14 juta karakter).
+3. **Chat** — tanya arti kata KBBI atau arti gaul (`apa arti gw`).
+
+**Sinkron otomatis** saat `train` jika file di `kbbi/` lebih baru dari seed, atau jumlah pasangan `kbbi_*` di seed masih sedikit. **Paksa ulang:**
+
+```bash
+export SPACEAX_KBBI_SYNC=1
+python main.py train --regen
+```
+
+Setelah menambah file KBBI baru, hapus checkpoint & vocab lama lalu `--regen` (ukuran embedding berubah jika vocab profil berubah).
 
 ---
 
-## 🚀 Panduan Memulai Cepat (Quickstart)
+## Struktur folder & modul
 
-Ikuti alur visual berikut untuk mempersiapkan lingkungan kerja dan menjalankan SpaceAx AI:
+```
+SpaceAX-AI-BETA/            # nama folder setelah git clone
+├── main.py                 # CLI: train, chat, learn, retrain, test, chatdev
+├── chat.py                 # UI terminal + generasi + fallback percakapan
+├── requirements.txt
+├── core/
+│   ├── config.py           # Profil model (small→promax), training, path, deteksi RAM/GPU
+│   ├── promax.py           # Sub-tier promax_1b / 4b / 8b
+│   ├── model.py            # SpaceaxModel — Transformer decoder-only + RoPE
+│   ├── tokenizer.py        # BPETokenizer (tokenizers HuggingFace)
+│   ├── kbbi.py             # KBBI JSON + txt slang/list/root → seed & tokenizer
+│   └── debug_log.py        # Log opsional (SPACEAX_DEBUG=1) → data/logs/
+├── training/
+│   ├── generate_seed_data.py   # conversations.json (math, emosi, dll.)
+│   ├── seed_extra.py           # Topik tambahan (teknologi, budaya, coding massal)
+│   ├── composition_variants.py # Variasi intent (anti hafal satu kalimat)
+│   ├── text_augment.py         # Paraphrase on-the-fly
+│   ├── dataset.py              # DataLoader + augmentasi dinamis
+│   └── trainer.py              # Loop training, checkpoint, sample per epoch
+├── learning/
+│   ├── internet.py         # Pencarian & cache (ddgs)
+│   ├── web_learner.py        # Belajar topik dari web
+│   ├── knowledge_base.py     # Penyimpanan pengetahuan terstruktur
+│   └── auto_trainer.py       # Hook auto-retrain (jika dipakai)
+├── memory/
+│   ├── memory.py             # STM buffer + LTM SQLite
+│   └── vector_store.py       # Pencarian fakta mirip (embedding sederhana)
+├── personality/
+│   └── emotion_engine.py     # 9 emosi + decay + pengaruh gaya jawaban
+├── data/
+│   ├── seed/conversations.json
+│   ├── checkpoints/model_best.pt, model_epoch_N.pt
+│   ├── vocab/                # BPE tersimpan
+│   ├── knowledge/              # Hasil internet
+│   ├── memories/               # Memori & gaya user
+│   └── conversation_logs/      # chat_history.json untuk retrain
+└── kbbi/
+    ├── ekstrak.zip           # ekstrak sekali saat instalasi → file di bawah
+    ├── kbbi_v_part1.json …   # (hasil ekstrak)
+    └── …                     # slang, list kata, root, stop words
+```
 
-<p align="center">
-  <img src="assetsMD/quickstart_flow.svg" alt="Quickstart Workflow" width="850" />
-</p>
+### Peran modul (ringkas)
 
-### ⚙️ Instalasi Sistem
+| Modul | Fungsi |
+|-------|--------|
+| `core/model.py` | Arsitektur neural; `generate()` untuk inferensi token demi token. |
+| `core/kbbi.py` | Muat leksikon, `enrich_all_training_data()`, `generate_corpus()`, deteksi gibberish. |
+| `core/config.py` | Auto-pilih ukuran model dari RAM; override `--size`, `--promax-tier`, `--force`. |
+| `training/trainer.py` | AdamW/Adafactor, AMP, early stopping (bisa dimatikan dengan `--force`). |
+| `chat.py` | Routing: matematika → KBBI/slang → knowledge → **model** → internet; validator 3 tingkat. |
+| `personality/emotion_engine.py` | Deteksi emosi; ProMax: mood lebih halus + `max_gen_len` lebih panjang. |
+| `memory/memory.py` | Konteks beberapa giliran terakhir masuk prompt model. |
 
-#### 💻 Windows:
-1.  Unduh dan pasang Python 3.10–3.12 dari [python.org](https://www.python.org/) (centang opsi **Add Python to PATH**).
-2.  Buka Command Prompt atau PowerShell di direktori proyek:
-    ```cmd
-    git clone https://github.com/thomasalfareno/SpaceAX-AI-BETA.git
-    cd SpaceAX-AI-BETA
-    ```
-3.  Ekstrak KBBI (ikuti panduan di atas).
-4.  Buat environment virtual dan pasang dependensi:
-    ```cmd
-    python -m venv .venv
-    .venv\Scripts\activate
-    python -m pip install -U pip
-    pip install -r requirements.txt
-    pip install "ddgs>=9.14.0"
-    ```
-5.  Pasang PyTorch dengan CUDA jika menggunakan GPU NVIDIA (lihat instruksi resmi di [pytorch.org](https://pytorch.org/get-started/locally/)).
+---
 
-#### 🐧 Linux:
+## Persyaratan
+
+- Python 3.10–3.12 disarankan (3.14 bisa jika PyTorch mendukung).
+- RAM menentukan profil default (lihat tabel ProMax).
+- GPU opsional; CUDA mempercepat training.
+- Paket wajib: `torch`, `ddgs`, `rich`, `tokenizers`, `numpy`, `requests`, `beautifulsoup4`.
+- Setelah ekstrak `kbbi/ekstrak.zip`: minimal `kbbi_v_part1.json` … `part4.json` + file txt leksikon.
+
+---
+
+## Instalasi Windows
+
+1. Pasang Python dari [python.org](https://www.python.org/) — centang **Add Python to PATH**.
+2. Buka Command Prompt atau PowerShell, masuk ke folder proyek:
+
+```cmd
+git clone https://github.com/thomasalfareno/SpaceAX-AI-BETA.git
+cd SpaceAX-AI-BETA
+```
+
+3. Ekstrak KBBI (sekali):
+
+```powershell
+Expand-Archive -Path kbbi\ekstrak.zip -DestinationPath kbbi\temp
+Move-Item kbbi\temp\* kbbi\
+Remove-Item kbbi\temp -Recurse -Force
+Remove-Item kbbi\ekstrak.zip
+```
+
+4. Virtual environment:
+
+```cmd
+python -m venv .venv
+.venv\Scripts\activate
+python -m pip install -U pip
+pip install -r requirements.txt
+pip install "ddgs>=9.14.0"
+```
+
+5. PyTorch + CUDA (jika ada NVIDIA): ikuti perintah di [pytorch.org](https://pytorch.org/get-started/locally/) sesuai driver Anda.
+
+6. Cek:
+
+```cmd
+python -c "from ddgs import DDGS; import torch; print('ok', torch.__version__)"
+```
+
+---
+
+## Instalasi Linux
+
 ```bash
 git clone https://github.com/thomasalfareno/SpaceAX-AI-BETA.git
 cd SpaceAX-AI-BETA
 
-# Ekstrak KBBI (wajib)
+# Ekstrak KBBI (wajib sekali)
 unzip -q kbbi/ekstrak.zip -d kbbi/temp
 mv kbbi/temp/* kbbi/
 rm -rf kbbi/temp kbbi/ekstrak.zip
 
-# Buat venv
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -U pip
@@ -179,79 +229,232 @@ pip install -r requirements.txt
 pip install "ddgs>=9.14.0"
 ```
 
----
+Di Arch/Ubuntu dengan PEP 668, pakai venv seperti di atas agar tidak bentrok paket sistem.
 
-## 🤖 Model Tier ProMax (1B / 4B / 8B)
+Verifikasi:
 
-SpaceAx AI menawarkan skala parameter yang disesuaikan secara otomatis berdasarkan memori (RAM) sistem Anda, atau dapat dipaksa menggunakan flag tertentu:
-
-<p align="center">
-  <img src="assetsMD/promax_tiers.svg" alt="ProMax Tiers" width="850" />
-</p>
-
-### Spesifikasi Skala ProMax:
-
-| Tingkatan (Tier) | Estimasi Parameter | Ukuran Vocab | Rekomendasi RAM | VRAM Training (Min) |
-| :--- | :--- | :--- | :--- | :--- |
-| `promax_1b` | ~1.2B | 96.000 | 48 GB | 16 GB (CUDA T4 Batch Kecil) |
-| `promax_4b` | ~4.0B | 128.000 | 64 GB | $\ge$ 24 GB |
-| `promax_8b` | ~8.0B | 160.000 | 96 GB | $\ge$ 40 GB (Rekomendasi A100) |
-
-> [!TIP]
-> **VRAM-Fit Otomatis**: Menjalankan dengan flag `--force` pada tier tinggi di VRAM pas-pasan akan mengaktifkan optimalisasi otomatis (seperti penyesuaian `seq_len` ke 256-384, aktivasi `bfloat16`, dan akumulasi gradien bertahap) untuk mencegah terjadinya Out-Of-Memory (OOM).
+```bash
+python -c "from ddgs import DDGS; import torch; print('ok', torch.__version__)"
+```
 
 ---
 
-## ⌨️ Perintah CLI (Command Line Interface)
+## Google Colab
 
-Format perintah CLI:
+Contoh sel di notebook (urutan penting: clone → **ekstrak zip** → pip → train):
+
+```python
+# 1) Mount Drive (opsional, untuk simpan checkpoint)
+from google.colab import drive
+drive.mount('/content/drive')
+
+# 2) Clone repo
+!git clone https://github.com/thomasalfareno/SpaceAX-AI-BETA.git
+%cd SpaceAX-AI-BETA
+
+# 3) Ekstrak KBBI (wajib sekali — dari kbbi/ekstrak.zip di repo)
+!unzip -q kbbi/ekstrak.zip -d kbbi/temp
+!mv kbbi/temp/* kbbi/
+!rm -rf kbbi/temp kbbi/ekstrak.zip
+
+# 4) Dependensi
+!pip install -q -U pip
+!pip install -q -r requirements.txt
+!pip install -q "ddgs>=9.14.0"
+
+# 5) Cek KBBI terbaca (opsional)
+!ls kbbi/kbbi_v_part1.json
+
+# 6) Tier aman untuk T4 16GB
+import os
+os.environ["SPACEAX_PROMAX_TIER"] = "promax_1b"
+
+# 7) Training
+!python main.py train --size promax --regen --epochs 30
+```
+
+Simpan checkpoint ke Drive:
+
+```python
+!mkdir -p "/content/drive/MyDrive/SpaceAX/checkpoints"
+!cp data/checkpoints/model_best.pt "/content/drive/MyDrive/SpaceAX/checkpoints/"
+```
+
+### ProMax 8B di Colab (A100 40 GB+)
+
+**Jangan** di runtime T4 (15 GB VRAM) — akan macet/OOM di `Inisialisasi Model`. Pilih *Runtime → A100*.
+
+```python
+!git clone https://github.com/thomasalfareno/SpaceAX-AI-BETA.git
+%cd SpaceAX-AI-BETA
+
+!unzip -q kbbi/ekstrak.zip -d kbbi/temp
+!mv kbbi/temp/* kbbi/
+!rm -rf kbbi/temp kbbi/ekstrak.zip
+
+!pip install -q -r requirements.txt
+!pip install -q "ddgs>=9.14.0"
+
+import torch
+print(torch.cuda.is_available(), torch.cuda.get_device_name(0))
+
+# Tes 2 epoch (chat belum pintar; naikkan epoch untuk hasil nyata)
+!python main.py train --size promax --promax-tier promax_8b --epochs 2 --batch-size 1 --grad-accum 16 --regen --force
+```
+
+`--force` = tier **tetap 8B** (tidak downgrade), early stopping mati, plus **VRAM-fit** otomatis (`seq_len` / batch / bobot bf16 disesuaikan GPU).
+`--epochs 2` hanya untuk cek pipeline jalan; chat baru enak setelah puluhan epoch.
+
+---
+
+## Perintah CLI
+
+Semua lewat:
+
 ```bash
 python main.py <perintah> [opsi]
 ```
 
-### 1. Melatih Model (`train`)
-Melatih tokenizer BPE dan melatih model SpaceAx AI dari awal.
+### `train` — melatih model
+
 ```bash
-# Melatih model dengan profil sedang selama 40 epoch
+python main.py train
+```
+
+| Opsi | Keterangan |
+|------|------------|
+| `--size` | `small`, `medium`, `large`, `ultra`, `promax` (default: auto dari RAM) |
+| `--promax-tier` | `promax_1b`, `promax_4b`, `promax_8b` |
+| `--epochs` | Jumlah epoch (ProMax default minimal 30) |
+| `--batch-size` | Batch per langkah |
+| `--grad-accum` | Akumulasi gradien (batch efektif = batch × accum) |
+| `--regen` | Buat ulang seed + tokenizer + sinkron KBBI/leksikon |
+| `--force` | **Tidak** turunkan tier/RAM; **matikan** early stopping; jalankan semua epoch |
+
+**Contoh**
+
+```bash
+# Profil menengah, 40 epoch
 python main.py train --size medium --epochs 40
 
-# Melatih model ProMax 1B di GPU T4
+# ProMax 1B (Colab T4)
 python main.py train --size promax --promax-tier promax_1b --epochs 30
 
-# Melatih ulang & regenerasi dataset kamus (setelah merubah isi kbbi/)
+# ProMax 8B dipaksa walau RAM/VRAM kurang (lambat / bisa OOM)
+python main.py train --size promax --promax-tier promax_8b --epochs 50 --force --batch-size 1 --grad-accum 24
+
+# Setelah menambah file di kbbi/ atau ubah vocab
+export SPACEAX_KBBI_SYNC=1
+python main.py train --regen
+
+# Hanya regenerasi seed tanpa KBBI paksa (jika sudah sinkron)
 python main.py train --regen
 ```
 
-### 2. Mengobrol dengan AI (`chat`)
-Membuka sesi tanya jawab interaktif dengan model yang telah dilatih.
-```bash
-# Mode chat standar
-python main.py chat
-
-# Mode chat pengembang (dev mode dengan debugging)
-python main.py chat --mode chatdev
-```
-> [!TIP]
-> Di dalam mode chat, Anda dapat mengetik `!search <topik>` untuk memicu crawler internet DuckDuckGo secara langsung dan menyimpan hasilnya ke basis pengetahuan lokal model.
-
-### 3. Belajar Topik Baru dari Internet (`learn`)
-Memerintahkan AI untuk mempelajari informasi baru dari web.
-```bash
-python main.py learn "hukum bernoulli dalam fisika"
-```
-
-### 4. Menggabungkan Riwayat Chat ke Dataset (`retrain`)
-Menggabungkan data log obrolan harian (`data/conversation_logs/chat_history.json`) ke dalam data seed untuk dilatih kembali agar AI makin pintar.
-```bash
-python main.py retrain --epochs 25
-```
+Output: `data/checkpoints/model_best.pt`, `data/checkpoints/model_epoch_<N>.pt`.
 
 ---
 
-## 📊 Kinerja Vocab Berdasarkan Profil
+### `chat` — percakapan interaktif
 
-| Profil Model | Target Ukuran Vocab BPE |
-| :--- | :--- |
+```bash
+python main.py chat
+python main.py chat --mode chatdev
+python main.py chat --size promax --promax-tier promax_1b
+python chat.py
+```
+
+Di dalam chat:
+
+- `!search <topik>` — cari internet & simpan ke knowledge base.
+- Riwayat beberapa giliran ikut ke prompt model (bukan hanya pesan terakhir).
+
+**Mode chatdev:** debugging / introspeksi training (perintah internal tambahan di sesi).
+
+---
+
+### `learn` — belajar satu topik dari web
+
+```bash
+python main.py learn "transformer neural network"
+python main.py learn "hukum archimedes"
+```
+
+Butuh `ddgs` dan koneksi jaringan.
+
+---
+
+### `retrain` — latih ulang dengan log percakapan
+
+Setelah beberapa kali `chat`, log ada di `data/conversation_logs/chat_history.json`.
+
+```bash
+python main.py retrain
+python main.py retrain --size promax --epochs 25 --promax-tier promax_1b
+python main.py retrain --force --epochs 40
+```
+
+Retrain menggabungkan log ke `data/seed/conversations.json`, menghapus vocab lama, lalu memanggil pipeline `train` lagi.
+
+---
+
+### `test` — uji modul tanpa chat panjang
+
+```bash
+python main.py test
+```
+
+Menjalankan beberapa pertanyaan uji (identitas, kode, pengetahuan, emosi).
+
+---
+
+### `chatdev` — alias chat mode dev
+
+```bash
+python main.py chatdev
+```
+
+Sama dengan `python main.py chat --mode chatdev`.
+
+---
+
+## ProMax 1B / 4B / 8B
+
+ProMax = arsitektur SpaceAx dengan skala berbeda (bukan unduh LLM eksternal).
+
+| Tier | ~Parameter | Vocab | RAM disarankan | VRAM training (kasar) |
+|------|------------|-------|----------------|------------------------|
+| `promax_1b` | ~1.2B | 96k | 48 GB | 16 GB (T4, batch kecil) |
+| `promax_4b` | ~4B | 128k | 64 GB | ≥24 GB |
+| `promax_8b` | ~8B | 160k | 96 GB | ≥40 GB |
+
+Profil `small`–`ultra` juga memakai vocab lebih besar (72k–128k). Setelah ubah vocab, wajib `train --regen`.
+
+Pemilihan otomatis (tanpa paksa): RAM ≥96 & VRAM cukup → 8B; RAM ≥64 → 4B; selain itu → 1B.
+
+Paksa tier:
+
+```bash
+export SPACEAX_PROMAX_TIER=promax_8b
+python main.py train --size promax --force
+```
+
+atau:
+
+```bash
+python main.py train --size promax --promax-tier promax_8b --force
+```
+
+**`--force` + ProMax 8B:** tier tidak diturunkan; **VRAM-fit** menyesuaikan `max_seq_len`, batch, grad accum, dan (jika VRAM &lt; 40 GB) bobot **bfloat16** agar memakai GPU semaksimal mungkin tanpa OOM. Di T4 (15 GB) seq_len bisa turun ke 256–384 — masih 8B arsitektur, bukan tier lebih kecil.
+
+Checkpoint **tidak** bisa dipakai antar tier (ukuran layer & vocab beda).
+
+---
+
+## Ukuran vocab per profil
+
+| Profil | Vocab BPE (target) |
+|--------|-------------------|
 | `small` | 72.000 |
 | `medium` / `large` | 96.000 |
 | `ultra` | 128.000 |
@@ -259,56 +462,116 @@ python main.py retrain --epochs 25
 | `promax_4b` | 128.000 |
 | `promax_8b` | 160.000 |
 
-*   Dataset bawaan berkisar pada ~4.000+ pasangan percakapan logika dasar.
-*   Selama training, leksikon KBBI akan memperluas dataset sebanyak **~8.000–12.000** pasangan kata baru tergantung profil vocab.
+Tokenizer memakai `min_frequency=1` untuk vocab ≥ 96k agar lebih banyak token unik dari corpus KBBI.
+
+Dataset seed dasar ~4.000+ pasangan (`generate_seed_data` + `seed_extra`); saat training ditambah **~8.000–12.000** pasangan KBBI/leksikon tergantung profil.
 
 ---
 
-## 💡 Apa yang Wajar Diharapkan?
+## Training & chat: apa yang wajar diharapkan
 
-*   **Epoch 1**: Nilai `val_loss` akan sangat tinggi (6.0 - 8.0+ pada ProMax). Ini normal karena model baru mempelajari distribusi token. Target kenyamanan respon adalah `val_loss` $\le$ 3.5.
-*   **Validator 3 Tingkat**: Chat engine menggunakan filter respon 3 lapis (ketat $\rightarrow$ longgar $\rightarrow$ draf) untuk memilah respon buatan model. Jika kualitas respon di bawah standar (karena epoch kurang), chat engine secara otomatis akan melakukan fallback ke respon tata bahasa siap pakai.
-*   **Perilaku Respon Berdasarkan Val Loss**:
-    *   $\le$ 3.5: Generasi model diprioritaskan penuh, validator ketat.
-    *   3.5 - 5.5: Generasi model digabungkan dengan validator longgar.
-    *   5.5 - 7.5: Teks model lolos dengan standar draf.
-    *   $>$ 7.5: Model dicoba secukupnya, sering terjadi fallback jika struktur rusak.
+### Training
+
+- **Epoch 1** hampir selalu menghasilkan `val_loss` tinggi (6–8+ pada ProMax). Itu normal; model baru belajar distribusi token.
+- **Early stopping** (default): berhenti jika val loss tidak membaik beberapa epoch berturut-turut. Gunakan `--force` agar **semua** epoch di `--epochs` / default ProMax (≥30) tetap jalan.
+- Batch besar menstabilkan gradien, tetapi **tidak** menggantikan epoch yang cukup.
+
+### Chat terasa "template"
+
+Penyebab umum:
+
+1. Baru **1 epoch** — otak belum cukup; lanjutkan sampai `val_loss` turun (target nyaman ~4, ideal ~3.5).
+2. Checkpoint tier beda dengan yang dilatih — load `model_best.pt` yang cocok dengan `--promax-tier` saat chat.
+3. Output model ditolak validator → sekarang chat mencoba 3 tingkat (ketat → longgar → draft) sebelum fallback; setelah epoch sedikit, Anda akan melihat teks dari model meski masih kaku.
+
+| val_loss (di checkpoint) | Perilaku |
+|--------------------------|----------|
+| ≤ 3.5 | Generasi model prioritas, validator ketat |
+| 3.5 – 5.5 | Model + validator longgar |
+| 5.5 – 7.5 | Model + validator draft (teks mentah lebih sering lolos) |
+| > 7.5 | Tetap dicoba dengan validator draft; fallback jika gagal |
+
+File yang dimuat chat: `data/checkpoints/model_best.pt`.
 
 ---
 
-## ⚙️ Variabel Lingkungan (Environment Variables)
+## Variabel lingkungan
 
-Anda dapat mengontrol parameter SpaceAx AI tanpa argumen CLI dengan mendefinisikan variabel berikut:
-
-| Variabel | Deskripsi |
-| :--- | :--- |
-| `SPACEAX_PROMAX_TIER` | Mengatur tier ProMax (`promax_1b`, `promax_4b`, `promax_8b`). |
-| `SPACEAX_FORCE` | Mengesampingkan pemeriksaan memori (set `1` atau `true` untuk mematikan early stopping). |
-| `SPACEAX_KBBI_SYNC` | Set `1` untuk memaksa sinkronisasi ulang database KBBI saat proses training. |
-| `SPACEAX_DEBUG` | Set `1` untuk mencatat log runtime secara mendalam di `data/logs/`. |
+| Variabel | Fungsi |
+|----------|--------|
+| `SPACEAX_PROMAX_TIER` | `promax_1b`, `promax_4b`, `promax_8b` |
+| `SPACEAX_FORCE` | `1` / `true` — sama efeknya dengan `--force` |
+| `SPACEAX_KBBI_SYNC` | `1` / `true` — paksa gabung ulang KBBI+leksikon ke seed |
+| `SPACEAX_DEBUG` | `1` — tulis log ke `data/logs/spaceax_runtime.ndjson` |
 
 ---
 
-## 🛠️ Pemecahan Masalah (Troubleshooting)
+## Masalah umum
 
-### 1. `ModuleNotFoundError: No module named 'ddgs'`
-Pastikan library DuckDuckGo Search terpasang pada virtual environment Anda:
+### `ModuleNotFoundError: No module named 'ddgs'`
+
 ```bash
 pip install "ddgs>=9.14.0"
 ```
 
-### 2. Macet saat "Inisialisasi Model Transformer..."
-Ini bukan error. PyTorch sedang mengalokasikan parameter bobot model yang sangat besar ke memori. Proses ini dapat memakan waktu **1–5 menit** di Colab T4 untuk model ProMax 1B. Harap tunggu hingga selesai alokasi.
+Pastikan venv aktif: `which python` → path ke `.venv`.
 
-### 3. Error CUDA Out-Of-Memory (OOM)
-Jika GPU kehabisan memori saat melatih ProMax, turunkan batch size atau aktifkan gradien akumulasi:
+### Macet di `🏗️ Inisialisasi Model Transformer...` (Colab)
+
+Bukan error — PyTorch sedang **mengalokasikan bobot** (embedding + puluhan layer). Tidak ada progress bar, jadi terlihat hang.
+
+- **Jangan Ctrl+C** dulu; ProMax 1B di Colab T4 biasanya **1–5 menit** di baris itu.
+- Pastikan runtime **GPU**: menu *Runtime → Change runtime type → T4 GPU*.
+- Cek di notebook: `import torch; print(torch.cuda.is_available())` → harus `True`.
+- `promax_8b` di Colab T4: pakai `--force` (VRAM-fit otomatis); seq_len disesuaikan (~256–384). Untuk hasil lebih stabil, A100 40 GB+ lebih disarankan. Alternatif ringan:
+
 ```bash
-python main.py train --size promax --promax-tier promax_1b --batch-size 1 --grad-accum 16
+!python main.py train --size promax --promax-tier promax_1b --epochs 30 --regen
 ```
+
+Atau lebih ringan untuk uji cepat:
+
+```bash
+!python main.py train --size medium --epochs 20 --regen
+```
+
+### CUDA OOM
+
+- Turunkan tier: `--promax-tier promax_1b`
+- `--batch-size 1 --grad-accum 16` (atau lebih besar accum)
+- Profil lebih kecil: `--size large` atau `medium`
+
+### Training ProMax 8B berhenti sendiri di epoch kecil
+
+Tanpa `--force`, early stopping bisa menghentikan training. Jalankan:
+
+```bash
+python main.py train --size promax --promax-tier promax_8b --epochs 50 --force
+```
+
+### Chat selalu kalimat siap (fallback)
+
+- Lanjutkan training; cek `val_loss` di log training.
+- Pastikan `model_best.pt` ada.
+- Tier saat chat = tier saat train.
+
+### Checkpoint tidak cocok
+
+Hapus `data/checkpoints/*` dan latih ulang, atau `--regen` jika vocab berubah.
+
+### KBBI tidak terbaca / seed tidak bertambah
+
+- Sudah **ekstrak** `kbbi/ekstrak.zip`? Tanpa itu tidak ada `kbbi_v_part1.json`.
+- Pastikan `kbbi/kbbi_v_part1.json` ada: `ls kbbi/kbbi_v_part1.json`
+- Cek log training: harus muncul `Leksikon dimuat: … kata unik`.
+- Paksa sinkron seed: `SPACEAX_KBBI_SYNC=1 python main.py train --regen`.
 
 ---
 
-<!-- Banner Footer -->
-<p align="center">
-  <img src="assetsMD/footer.svg" alt="SpaceAx AI Footer" width="900" />
-</p>
+## Kontak
+
+**Thomas Alfareno Ananta Nugraha**
+Teknik Informatika — FTEIC — ITS Surabaya
+Space Ax Corp — SpaceAx AI
+
+GitHub: [thomasalfareno/SpaceAX-AI-BETA](https://github.com/thomasalfareno/SpaceAX-AI-BETA)
