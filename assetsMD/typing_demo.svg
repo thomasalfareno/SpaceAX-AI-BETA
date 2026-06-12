@@ -1,360 +1,255 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 800" width="100%" height="100%">
-
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 400" width="100%" height="100%">
+  <!-- Definitions -->
   <defs>
-
-    <!-- BACKGROUND -->
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#050816"/>
-      <stop offset="100%" stop-color="#0b1220"/>
-    </linearGradient>
-
-    <!-- PANEL -->
-    <linearGradient id="panel" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0f172a"/>
-      <stop offset="100%" stop-color="#111827"/>
-    </linearGradient>
-
-    <!-- HEADER -->
-    <linearGradient id="header" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#111827"/>
-      <stop offset="100%" stop-color="#1e293b"/>
-    </linearGradient>
-
-    <!-- SHADOW -->
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="20" stdDeviation="30"
-        flood-color="#000000"
-        flood-opacity="0.55"/>
+    <!-- Window Shadow Filter -->
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="12" stdDeviation="15" flood-color="#000000" flood-opacity="0.6"/>
     </filter>
 
-    <!-- GLOW -->
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="12" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-
-    <!-- COMMAND TYPING -->
-    <clipPath id="clipCommand">
-      <rect x="0" y="0" width="0" height="40">
-        <animate attributeName="width"
-          values="0;520;520"
-          keyTimes="0;0.85;1"
-          dur="2.8s"
-          begin="0.3s"
-          repeatCount="indefinite"/>
+    <!-- Clip Paths for Typing Lines -->
+    <!-- Screen 1: Command 1 (Length: 39 chars, starts at x=151, width=328) -->
+    <clipPath id="clip-cmd1">
+      <rect x="151" y="-15" width="0" height="25">
+        <animate attributeName="width" values="0;328;328" keyTimes="0;0.8;1" dur="2.2s" begin="0.5s" repeatCount="indefinite" />
       </rect>
     </clipPath>
 
-    <!-- CHAT TYPING -->
-    <clipPath id="clipReply">
-      <rect x="0" y="0" width="0" height="140">
-        <animate attributeName="width"
-          values="0;620;620"
-          keyTimes="0;0.9;1"
-          dur="3s"
-          begin="7s"
-          repeatCount="indefinite"/>
+    <!-- Screen 2: Command 2 (Length: 19 chars, starts at x=151, width=160) -->
+    <clipPath id="clip-cmd2">
+      <rect x="151" y="-15" width="0" height="25">
+        <animate attributeName="width" values="0;160;160" keyTimes="0;0.8;1" dur="1.5s" begin="9.0s" repeatCount="indefinite" />
       </rect>
     </clipPath>
 
+    <!-- Screen 2: User Input (Length: 18 chars, starts at x=50, width=152) -->
+    <clipPath id="clip-user1">
+      <rect x="50" y="-15" width="0" height="25">
+        <animate attributeName="width" values="0;152;152" keyTimes="0;0.8;1" dur="1.5s" begin="12.0s" repeatCount="indefinite" />
+      </rect>
+    </clipPath>
+
+    <!-- Screen 2: Bot Reply Line 1 (Length: 40 chars, starts at x=76, width=336) -->
+    <clipPath id="clip-bot-l1">
+      <rect x="76" y="-15" width="0" height="25">
+        <animate attributeName="width" values="0;336;336" keyTimes="0;0.32;1" dur="2.5s" begin="14.2s" repeatCount="indefinite" />
+      </rect>
+    </clipPath>
+
+    <!-- Screen 2: Bot Reply Line 2 (Length: 29 chars, starts at x=76, width=244) -->
+    <clipPath id="clip-bot-l2">
+      <rect x="76" y="10" width="0" height="25">
+        <animate attributeName="width" values="0;0;244;244" keyTimes="0;0.36;0.64;1" dur="2.5s" begin="14.2s" repeatCount="indefinite" />
+      </rect>
+    </clipPath>
+
+    <!-- Screen 2: Bot Reply Line 3 (Length: 40 chars, starts at x=76, width=336) -->
+    <clipPath id="clip-bot-l3">
+      <rect x="76" y="35" width="0" height="25">
+        <animate attributeName="width" values="0;0;336;336" keyTimes="0;0.68;1" dur="2.5s" begin="14.2s" repeatCount="indefinite" />
+      </rect>
+    </clipPath>
   </defs>
 
   <style>
-
-    .bg {
-      fill: url(#bg);
+    .terminal-window {
+      fill: #0f141c;
+      stroke: #1b2433;
+      stroke-width: 1.5;
+      rx: 10px;
     }
-
-    .window {
-      fill: url(#panel);
-      stroke: #243244;
-      stroke-width: 1.2;
-      rx: 24;
+    .title-bar {
+      fill: #171d26;
+      stroke: #222b38;
+      stroke-width: 1.5;
     }
-
-    .header {
-      fill: url(#header);
-      stroke: #2d3748;
-      stroke-width: 1;
-    }
-
-    .title {
-      font-family: Inter, sans-serif;
-      font-size: 17px;
-      font-weight: 700;
-      fill: #f8fafc;
-      letter-spacing: 1px;
-    }
-
-    .text {
-      font-family: "JetBrains Mono", monospace;
-      font-size: 18px;
-      fill: #cbd5e1;
-    }
-
-    .prompt {
-      fill: #38bdf8;
-      font-weight: 700;
-    }
-
-    .command {
-      fill: #4ade80;
-    }
-
-    .success {
-      fill: #7dd3fc;
-    }
-
-    .warning {
-      fill: #facc15;
-    }
-
-    .ai {
-      fill: #67e8f9;
-    }
-
-    .muted {
-      fill: #64748b;
-    }
-
-    .cursor {
-      fill: #38bdf8;
-    }
-
-    .footer {
-      fill: #475569;
+    .window-title {
+      font-family: 'Fira Code', 'JetBrains Mono', Consolas, Monaco, monospace;
       font-size: 13px;
-      font-family: Inter, sans-serif;
+      fill: #707a8a;
+      font-weight: 500;
     }
-
+    .term-text {
+      font-family: 'Fira Code', 'JetBrains Mono', Consolas, Monaco, 'Courier New', monospace;
+      font-size: 14px;
+      fill: #abb2bf;
+      letter-spacing: 0px;
+    }
+    .prompt {
+      fill: #61afef;
+      font-weight: bold;
+    }
+    .command {
+      fill: #98c379;
+    }
+    .output-info {
+      fill: #5c6370;
+    }
+    .output-success {
+      fill: #98c379;
+    }
+    .output-warning {
+      fill: #d19a66;
+    }
+    .user-prompt {
+      fill: #e5c07b;
+      font-weight: bold;
+    }
+    .user-command {
+      fill: #abb2bf;
+    }
+    .bot-prompt {
+      fill: #c678dd;
+      font-weight: bold;
+    }
+    .bot-reply {
+      fill: #56b6c2;
+    }
+    .cursor {
+      fill: #528bff;
+    }
   </style>
 
-  <!-- BG -->
-  <rect width="1400" height="800" class="bg"/>
+  <!-- Terminal Window Background with Shadow -->
+  <rect x="15" y="15" width="820" height="370" class="terminal-window" filter="url(#shadow)" />
 
-  <!-- Glow -->
-  <circle cx="1180" cy="120" r="160"
-    fill="#06b6d4"
-    opacity="0.08"
-    filter="url(#glow)"/>
+  <!-- Title Bar -->
+  <path d="M 15 25 A 10 10 0 0 1 25 15 L 825 15 A 10 10 0 0 1 835 25 L 835 50 L 15 50 Z" class="title-bar" />
+  
+  <!-- Window Control Buttons (macOS style) -->
+  <circle cx="40" cy="32" r="6" fill="#ff5f56" />
+  <circle cx="60" cy="32" r="6" fill="#ffbd2e" />
+  <circle cx="80" cy="32" r="6" fill="#27c93f" />
 
-  <circle cx="220" cy="720" r="180"
-    fill="#3b82f6"
-    opacity="0.05"
-    filter="url(#glow)"/>
+  <!-- Window Title -->
+  <text x="425" y="36" text-anchor="middle" class="window-title">SpaceAx AI v2.0.0 — Terminal</text>
 
-  <!-- WINDOW -->
-  <rect x="90"
-        y="70"
-        width="1220"
-        height="640"
-        class="window"
-        filter="url(#shadow)"/>
-
-  <!-- HEADER -->
-  <path d="
-    M90 96
-    Q90 70 116 70
-    H1284
-    Q1310 70 1310 96
-    V128
-    H90
-    Z"
-    class="header"/>
-
-  <!-- MAC BUTTON -->
-  <circle cx="130" cy="100" r="8" fill="#ff5f56"/>
-  <circle cx="160" cy="100" r="8" fill="#ffbd2e"/>
-  <circle cx="190" cy="100" r="8" fill="#27c93f"/>
-
-  <!-- TITLE -->
-  <text x="700"
-        y="106"
-        text-anchor="middle"
-        class="title">
-    SPACEAX AI • THOMAS TERMINAL
-  </text>
-
-  <!-- LEFT TERMINAL -->
-  <g class="text">
-
-    <!-- COMMAND -->
-    <g transform="translate(140,190)">
-
-      <text x="0" y="0">
-        <tspan class="prompt">thomas@spaceax:~$ </tspan>
-      </text>
-
-      <g clip-path="url(#clipCommand)">
-        <text x="250" y="0" class="command">
-          python main.py train --size promax --regen
-        </text>
-      </g>
-
-      <!-- CURSOR -->
-      <rect x="250"
-            y="-17"
-            width="10"
-            height="20"
-            class="cursor">
-
-        <animate attributeName="x"
-          values="250;760;760"
-          keyTimes="0;0.85;1"
-          dur="2.8s"
-          begin="0.3s"
-          repeatCount="indefinite"/>
-
-        <animate attributeName="opacity"
-          values="1;0;1"
-          dur="0.8s"
-          repeatCount="indefinite"/>
+  <!-- ================= SCREEN 1: TRAINING PANEL ================= -->
+  <g class="term-text">
+    <animate attributeName="opacity" values="1;1;0;0;1" keyTimes="0;0.43;0.46;0.97;1" dur="18s" repeatCount="indefinite" />
+    
+    <!-- Command Line -->
+    <g transform="translate(40, 85)">
+      <text x="0" y="0"><tspan class="prompt">thomas@spaceax:~$ </tspan></text>
+      <!-- Typed text with clip -->
+      <text x="151" y="0" class="command" clip-path="url(#clip-cmd1)">python main.py train --regen --epochs 30</text>
+      
+      <!-- Blinking Cursor (animates exactly to the end of the text) -->
+      <rect class="cursor" x="151" y="-12" width="8" height="15">
+        <animate attributeName="x" values="151;479;479" keyTimes="0;0.8;1" dur="2.2s" begin="0.5s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite" />
+        <!-- Hide when training output starts -->
+        <animate attributeName="visibility" to="hidden" begin="2.7s" dur="18s" repeatCount="indefinite" />
       </rect>
-
     </g>
 
-    <!-- LOGS -->
-    <text x="140" y="250">
-      🚀 Memuat leksikon KBBI...
-    </text>
-
-    <text x="140" y="295" class="success">
-      📚 112,847 kata unik berhasil dimuat
-    </text>
-
-    <text x="140" y="340">
-      🏗️ Inisialisasi Model Transformer...
-    </text>
-
-    <text x="140" y="385" class="warning">
-      ⚡ ProMax 1B • CUDA Enabled • VRAM-fit aktif
-    </text>
-
-    <text x="140" y="430">
-      🎯 Training epoch 12/30
-    </text>
-
-    <!-- PROGRESS -->
-    <rect x="140"
-          y="455"
-          width="420"
-          height="16"
-          rx="8"
-          fill="#1e293b"/>
-
-    <rect x="140"
-          y="455"
-          width="0"
-          height="16"
-          rx="8"
-          fill="#22c55e">
-
-      <animate attributeName="width"
-        values="0;310;310"
-        keyTimes="0;0.9;1"
-        dur="2.2s"
-        begin="2.4s"
-        repeatCount="indefinite"/>
-    </rect>
-
-    <text x="580"
-          y="468"
-          class="success">
-      74%
-    </text>
-
-    <text x="650"
-          y="468"
-          class="muted">
-      val_loss: 4.87 • ETA: 04:12
-    </text>
-
-  </g>
-
-  <!-- DIVIDER -->
-  <line x1="700"
-        y1="160"
-        x2="700"
-        y2="620"
-        stroke="#243244"
-        stroke-width="1"/>
-
-  <!-- RIGHT CHAT -->
-  <g class="text">
-
-    <text x="760" y="190">
-      <tspan class="prompt">thomas@spaceax:~$ </tspan>
-      <tspan class="command">python main.py chat</tspan>
-    </text>
-
-    <text x="760" y="255">
-      <tspan fill="#f472b6" font-weight="700">SpaceAx&gt; </tspan>
-      Halo! Ada yang bisa saya bantu? 🤖
-    </text>
-
-    <text x="760" y="320">
-      <tspan class="prompt">User&gt; </tspan>
-      Apa itu transformer?
-    </text>
-
-    <!-- AI REPLY -->
-    <g clip-path="url(#clipReply)">
-
-      <text x="760" y="395" class="ai">
-        Transformer adalah arsitektur neural network
-      </text>
-
-      <text x="760" y="435" class="ai">
-        berbasis self-attention mechanism yang
-      </text>
-
-      <text x="760" y="475" class="ai">
-        memproses token secara paralel untuk
-      </text>
-
-      <text x="760" y="515" class="ai">
-        pemodelan bahasa skala besar.
-      </text>
-
+    <!-- Training Outputs (staggered delay) -->
+    <g transform="translate(40, 115)">
+      <text x="0" y="0">🚀 Memuat leksikon KBBI...</text>
+      <animate attributeName="visibility" from="hidden" to="visible" begin="3.0s" dur="18s" repeatCount="indefinite" />
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="3.0s" repeatCount="indefinite" fill="freeze" />
     </g>
 
-    <!-- CURSOR -->
-    <rect x="760"
-          y="500"
-          width="10"
-          height="20"
-          class="cursor">
+    <g transform="translate(40, 145)">
+      <text x="0" y="0" class="output-success">📚 Leksikon dimuat: 112,847 kata unik</text>
+      <animate attributeName="visibility" from="hidden" to="visible" begin="3.8s" dur="18s" repeatCount="indefinite" />
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="3.8s" repeatCount="indefinite" fill="freeze" />
+    </g>
 
-      <animate attributeName="x"
-        values="760;1220;1220"
-        keyTimes="0;0.9;1"
-        dur="3s"
-        begin="7s"
-        repeatCount="indefinite"/>
+    <g transform="translate(40, 175)">
+      <text x="0" y="0">🏗️ Inisialisasi Model Transformer...</text>
+      <animate attributeName="visibility" from="hidden" to="visible" begin="4.6s" dur="18s" repeatCount="indefinite" />
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="4.6s" repeatCount="indefinite" fill="freeze" />
+    </g>
 
-      <animate attributeName="opacity"
-        values="1;0;1"
-        dur="0.8s"
-        repeatCount="indefinite"/>
-    </rect>
+    <g transform="translate(40, 205)">
+      <text x="0" y="0" class="output-warning">⚡ ProMax 1B — 1.2B parameters (RAM: 48GB, VRAM: 16GB)</text>
+      <animate attributeName="visibility" from="hidden" to="visible" begin="5.5s" dur="18s" repeatCount="indefinite" />
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="5.5s" repeatCount="indefinite" fill="freeze" />
+    </g>
 
+    <g transform="translate(40, 245)">
+      <text x="0" y="0">🎯 Training epoch 1/30</text>
+      <animate attributeName="visibility" from="hidden" to="visible" begin="6.3s" dur="18s" repeatCount="indefinite" />
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="6.3s" repeatCount="indefinite" fill="freeze" />
+    </g>
+
+    <!-- Progress bar & loss -->
+    <g transform="translate(40, 275)">
+      <!-- Progress Bar Track -->
+      <rect x="0" y="-12" width="200" height="14" fill="#1e2430" stroke="#2c384c" rx="3" />
+      <!-- Progress Bar Fill -->
+      <rect x="1" y="-11" width="0" height="12" fill="#98c379" rx="2">
+        <animate attributeName="width" values="0;160;160" keyTimes="0;0.9;1" dur="1.5s" begin="6.5s" repeatCount="indefinite" fill="freeze" />
+      </rect>
+      <!-- Percentage Text -->
+      <text x="215" y="0" class="output-success">80%</text>
+      <!-- Loss Info -->
+      <text x="260" y="0" class="output-info">loss: 4.872  val_loss: 5.120  (ETA: 04:12)</text>
+      
+      <animate attributeName="visibility" from="hidden" to="visible" begin="6.5s" dur="18s" repeatCount="indefinite" />
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="6.5s" repeatCount="indefinite" fill="freeze" />
+    </g>
   </g>
 
-  <!-- FOOTER -->
-  <text x="140"
-        y="665"
-        class="footer">
-    Built from scratch by Thomas Alfareno Ananta Nugraha • Space Ax Corp • ITS Surabaya
-  </text>
 
-  <text x="1240"
-        y="665"
-        text-anchor="end"
-        class="footer">
-    SpaceAx AI v2.0.0
-  </text>
+  <!-- ================= SCREEN 2: CHAT PANEL ================= -->
+  <g class="term-text" opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.45;0.48;0.95;0.98" dur="18s" repeatCount="indefinite" />
 
+    <!-- Chat Start Line command -->
+    <g transform="translate(40, 85)">
+      <text x="0" y="0"><tspan class="prompt">thomas@spaceax:~$ </tspan></text>
+      <!-- Typed command with clip -->
+      <text x="151" y="0" class="command" clip-path="url(#clip-cmd2)">python main.py chat</text>
+      
+      <!-- Blinking Cursor -->
+      <rect class="cursor" x="151" y="-12" width="8" height="15">
+        <animate attributeName="x" values="151;311;311" keyTimes="0;0.8;1" dur="1.5s" begin="9.0s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite" />
+        <!-- Hide cursor after command types -->
+        <animate attributeName="visibility" to="hidden" begin="10.8s" dur="18s" repeatCount="indefinite" />
+      </rect>
+    </g>
+
+    <!-- Bot Greeting -->
+    <g transform="translate(40, 120)">
+      <text x="0" y="0"><tspan class="bot-prompt">SpaceAx> </tspan>Halo! Ada yang bisa saya bantu? 🤖</text>
+      <animate attributeName="visibility" from="hidden" to="visible" begin="11.2s" dur="18s" repeatCount="indefinite" />
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="11.2s" repeatCount="indefinite" fill="freeze" />
+    </g>
+
+    <!-- User Input Line -->
+    <g transform="translate(40, 160)">
+      <text x="0" y="0"><tspan class="user-prompt">User> </tspan></text>
+      <!-- User command with clip -->
+      <text x="50" y="0" class="user-command" clip-path="url(#clip-user1)">Apa arti slang gw?</text>
+      
+      <!-- Blinking Cursor -->
+      <rect class="cursor" x="50" y="-12" width="8" height="15">
+        <animate attributeName="x" values="50;202;202" keyTimes="0;0.8;1" dur="1.5s" begin="12.0s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite" />
+        <!-- Hide cursor after input types -->
+        <animate attributeName="visibility" to="hidden" begin="13.8s" dur="18s" repeatCount="indefinite" />
+      </rect>
+      <animate attributeName="visibility" from="hidden" to="visible" begin="11.8s" dur="18s" repeatCount="indefinite" />
+    </g>
+
+    <!-- Bot Response typing -->
+    <g transform="translate(40, 200)">
+      <text x="0" y="0"><tspan class="bot-prompt">SpaceAx> </tspan></text>
+      
+      <!-- Multi-line AI response with staggered clip paths -->
+      <text x="76" y="0" class="bot-reply" clip-path="url(#clip-bot-l1)">Slang "gw" terdeteksi sebagai kata gaul.</text>
+      <text x="76" y="25" class="bot-reply" clip-path="url(#clip-bot-l2)">Arti baku: "saya" atau "aku".</text>
+      <text x="76" y="50" class="bot-reply" clip-path="url(#clip-bot-l3)">Disinkronkan otomatis dari leksikon KBBI.</text>
+      
+      <!-- Blinking Cursor (Types through all 3 lines realistically) -->
+      <rect class="cursor" x="76" y="-12" width="8" height="15">
+        <animate attributeName="x" values="76;412;76;319;76;412" keyTimes="0;0.32;0.36;0.64;0.68;1" dur="2.5s" begin="14.2s" repeatCount="indefinite" />
+        <animate attributeName="y" values="-12;-12;13;13;38;38" keyTimes="0;0.32;0.36;0.64;0.68;1" dur="2.5s" begin="14.2s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite" />
+      </rect>
+      <animate attributeName="visibility" from="hidden" to="visible" begin="14.0s" dur="18s" repeatCount="indefinite" />
+    </g>
+  </g>
 </svg>
