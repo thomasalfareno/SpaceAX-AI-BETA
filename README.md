@@ -1,31 +1,33 @@
-# SpaceAx AI
+# SpaceAx AI v2.0.0
 
-Mesin percakapan bahasa Indonesia berbasis Transformer decoder-only, dilatih dari nol di mesin sendiri (bukan model siap pakai dari HuggingFace). Dibangun Thomas Alfareno Ananta Nugraha — Teknik Informatika FTEIC ITS Surabaya, untuk Space Ax Corp.
+![SpaceAx AI Terminal Animation](assetsMD/readme_logo.svg)
+
+Mesin percakapan Bahasa Indonesia berbasis **Transformer decoder-only**, dilatih dari nol di mesin sendiri (bukan model siap pakai dari HuggingFace). Dibangun oleh **Thomas Alfareno Ananta Nugraha** — Teknik Informatika FTEIC ITS Surabaya, untuk **Space Ax Corp**.
 
 **Repositori:** [github.com/thomasalfareno/SpaceAX-AI-BETA](https://github.com/thomasalfareno/SpaceAX-AI-BETA)  
 **Versi:** 2.0.0
 
 ---
 
-## Isi
+## Daftar Isi
 
-1. [Gambaran singkat](#gambaran-singkat)
-2. [Folder `kbbi/` & sinkron leksikon](#folder-kbbi--sinkron-leksikon)
-3. [Struktur folder & modul](#struktur-folder--modul)
-4. [Persyaratan](#persyaratan)
+1. [Gambaran Singkat](#gambaran-singkat)
+2. [Folder `kbbi/` & Sinkron Leksikon](#folder-kbbi--sinkron-leksikon)
+3. [Struktur Folder & Modul](#struktur-folder--modul)
+4. [Persyaratan Sistem](#persyaratan-sistem)
 5. [Instalasi Windows](#instalasi-windows)
 6. [Instalasi Linux](#instalasi-linux)
 7. [Google Colab](#google-colab)
 8. [Perintah CLI](#perintah-cli)
 9. [ProMax 1B / 4B / 8B](#promax-1b--4b--8b)
-10. [Ukuran vocab per profil](#ukuran-vocab-per-profil)
-11. [Training & chat: apa yang wajar diharapkan](#training--chat-apa-yang-wajar-diharapkan)
-12. [Variabel lingkungan](#variabel-lingkungan)
-13. [Masalah umum](#masalah-umum)
+10. [Ukuran Vocab Per Profil](#ukuran-vocab-per-profil)
+11. [Training & Chat: Apa yang Wajar Diharapkan](#training--chat-apa-yang-wajar-diharapkan)
+12. [Variabel Lingkungan](#variabel-lingkungan)
+13. [Masalah Umum & Solusi](#masalah-umum)
 
 ---
 
-## Gambaran singkat
+## Gambaran Singkat
 
 Clone proyek:
 
@@ -39,16 +41,16 @@ Alur kerja biasa:
 1. Clone repo → **ekstrak `kbbi/ekstrak.zip` sekali** (isi JSON KBBI + leksikon txt).
 2. `pip install -r requirements.txt`
 3. `python main.py train` — latih tokenizer BPE + model, simpan checkpoint di `data/checkpoints/`.
-3. `python main.py chat` — ngobrol; model mencoba generate teks sendiri dulu, baru fallback jika output tidak layak.
-4. (Opsional) `python main.py retrain` — gabung log chat ke dataset lalu latih ulang.
+4. `python main.py chat` — ngobrol; model mencoba generate teks sendiri dulu, baru fallback jika output tidak layak.
+5. (Opsional) `python main.py retrain` — gabung log chat ke dataset lalu latih ulang.
 
-Fitur utama: memori percakapan (STM/LTM), mesin emosi, **KBBI + leksikon lengkap** (slang, daftar kata, kata dasar), pencarian internet (`ddgs`), augmentasi anti-hafalan, skala **ProMax** (~1.2B / ~4B / ~8B parameter), flag **`--force`** untuk training tanpa early stopping.
+**Fitur Utama:** memori percakapan (STM/LTM), mesin emosi, **KBBI + leksikon lengkap** (slang, daftar kata, kata dasar), pencarian internet (`ddgs`), augmentasi anti-hafalan, skala **ProMax** (~1.2B / ~4B / ~8B parameter), flag **`--force`** untuk training tanpa early stopping.
 
 ---
 
-## Folder `kbbi/` & sinkron leksikon
+## Folder `kbbi/` & Sinkron Leksikon
 
-### Wajib sekali: ekstrak `ekstrak.zip`
+### Wajib Sekali: Ekstrak `ekstrak.zip`
 
 Di repo ada **`kbbi/ekstrak.zip`** (~10 MB). File JSON/txt KBBI **tidak** dipakai langsung — user harus ekstrak dulu ke folder `kbbi/` (hanya saat instalasi pertama).
 
@@ -104,7 +106,7 @@ Setelah menambah file KBBI baru, hapus checkpoint & vocab lama lalu `--regen` (u
 
 ---
 
-## Struktur folder & modul
+## Struktur Folder & Modul
 
 ```
 SpaceAX-AI-BETA/            # nama folder setelah git clone
@@ -148,7 +150,7 @@ SpaceAX-AI-BETA/            # nama folder setelah git clone
     └── …                     # slang, list kata, root, stop words
 ```
 
-### Peran modul (ringkas)
+### Peran Modul (Ringkas)
 
 | Modul | Fungsi |
 |-------|--------|
@@ -162,7 +164,7 @@ SpaceAX-AI-BETA/            # nama folder setelah git clone
 
 ---
 
-## Persyaratan
+## Persyaratan Sistem
 
 - Python 3.10–3.12 disarankan (3.14 bisa jika PyTorch mendukung).
 - RAM menentukan profil default (lihat tabel ProMax).
@@ -191,7 +193,7 @@ Remove-Item kbbi\temp -Recurse -Force
 Remove-Item kbbi\ekstrak.zip
 ```
 
-4. Virtual environment:
+4. Virtual environment & dependensi:
 
 ```cmd
 python -m venv .venv
@@ -203,7 +205,7 @@ pip install "ddgs>=9.14.0"
 
 5. PyTorch + CUDA (jika ada NVIDIA): ikuti perintah di [pytorch.org](https://pytorch.org/get-started/locally/) sesuai driver Anda.
 
-6. Cek:
+6. Verifikasi:
 
 ```cmd
 python -c "from ddgs import DDGS; import torch; print('ok', torch.__version__)"
@@ -303,7 +305,6 @@ print(torch.cuda.is_available(), torch.cuda.get_device_name(0))
 ```
 
 `--force` = tier **tetap 8B** (tidak downgrade), early stopping mati, plus **VRAM-fit** otomatis (`seq_len` / batch / bobot bf16 disesuaikan GPU).  
-`--epochs 2` hanya untuk cek pipeline jalan; chat baru enak setelah puluhan epoch.
 
 ---
 
@@ -315,7 +316,7 @@ Semua lewat:
 python main.py <perintah> [opsi]
 ```
 
-### `train` — melatih model
+### `train` — Melatih Model
 
 ```bash
 python main.py train
@@ -346,34 +347,21 @@ python main.py train --size promax --promax-tier promax_8b --epochs 50 --force -
 # Setelah menambah file di kbbi/ atau ubah vocab
 export SPACEAX_KBBI_SYNC=1
 python main.py train --regen
-
-# Hanya regenerasi seed tanpa KBBI paksa (jika sudah sinkron)
-python main.py train --regen
 ```
 
-Output: `data/checkpoints/model_best.pt`, `data/checkpoints/model_epoch_<N>.pt`.
-
----
-
-### `chat` — percakapan interaktif
+### `chat` — Percakapan Interaktif
 
 ```bash
 python main.py chat
 python main.py chat --mode chatdev
 python main.py chat --size promax --promax-tier promax_1b
-python chat.py
 ```
 
 Di dalam chat:
-
 - `!search <topik>` — cari internet & simpan ke knowledge base.
 - Riwayat beberapa giliran ikut ke prompt model (bukan hanya pesan terakhir).
 
-**Mode chatdev:** debugging / introspeksi training (perintah internal tambahan di sesi).
-
----
-
-### `learn` — belajar satu topik dari web
+### `learn` — Belajar Satu Topik dari Web
 
 ```bash
 python main.py learn "transformer neural network"
@@ -382,23 +370,17 @@ python main.py learn "hukum archimedes"
 
 Butuh `ddgs` dan koneksi jaringan.
 
----
-
-### `retrain` — latih ulang dengan log percakapan
+### `retrain` — Latih Ulang dengan Log Percakapan
 
 Setelah beberapa kali `chat`, log ada di `data/conversation_logs/chat_history.json`.
 
 ```bash
 python main.py retrain
-python main.py retrain --size promax --epochs 25 --promax-tier promax_1b
-python main.py retrain --force --epochs 40
 ```
 
-Retrain menggabungkan log ke `data/seed/conversations.json`, menghapus vocab lama, lalu memanggil pipeline `train` lagi.
+Retrain menggabungkan log ke `data/seed/conversations.json`, menghapus vocab lama, lalu memanggil pipeline `train` kembali.
 
----
-
-### `test` — uji modul tanpa chat panjang
+### `test` — Uji Modul tanpa Chat Panjang
 
 ```bash
 python main.py test
@@ -408,94 +390,55 @@ Menjalankan beberapa pertanyaan uji (identitas, kode, pengetahuan, emosi).
 
 ---
 
-### `chatdev` — alias chat mode dev
-
-```bash
-python main.py chatdev
-```
-
-Sama dengan `python main.py chat --mode chatdev`.
-
----
-
 ## ProMax 1B / 4B / 8B
 
 ProMax = arsitektur SpaceAx dengan skala berbeda (bukan unduh LLM eksternal).
 
-| Tier | ~Parameter | Vocab | RAM disarankan | VRAM training (kasar) |
+| Tier | ~Parameter | Vocab | RAM disarankan | VRAM Training (Kasar) |
 |------|------------|-------|----------------|------------------------|
 | `promax_1b` | ~1.2B | 96k | 48 GB | 16 GB (T4, batch kecil) |
 | `promax_4b` | ~4B | 128k | 64 GB | ≥24 GB |
 | `promax_8b` | ~8B | 160k | 96 GB | ≥40 GB |
 
-Profil `small`–`ultra` juga memakai vocab lebih besar (72k–128k). Setelah ubah vocab, wajib `train --regen`.
-
-Pemilihan otomatis (tanpa paksa): RAM ≥96 & VRAM cukup → 8B; RAM ≥64 → 4B; selain itu → 1B.
-
-Paksa tier:
-
-```bash
-export SPACEAX_PROMAX_TIER=promax_8b
-python main.py train --size promax --force
-```
-
-atau:
-
-```bash
-python main.py train --size promax --promax-tier promax_8b --force
-```
-
-**`--force` + ProMax 8B:** tier tidak diturunkan; **VRAM-fit** menyesuaikan `max_seq_len`, batch, grad accum, dan (jika VRAM &lt; 40 GB) bobot **bfloat16** agar memakai GPU semaksimal mungkin tanpa OOM. Di T4 (15 GB) seq_len bisa turun ke 256–384 — masih 8B arsitektur, bukan tier lebih kecil.
-
-Checkpoint **tidak** bisa dipakai antar tier (ukuran layer & vocab beda).
+Checkout **tidak** bisa dipakai antar tier (ukuran layer & vocab berbeda).
 
 ---
 
-## Ukuran vocab per profil
+## Ukuran Vocab Per Profil
 
-| Profil | Vocab BPE (target) |
+| Profil | Vocab BPE (Target) |
 |--------|-------------------|
 | `small` | 72.000 |
 | `medium` / `large` | 96.000 |
 | `ultra` | 128.000 |
 | `promax_1b` | 96.000 |
-| `promax_4b` | 128.000 |
+| `promax_4b` | 128.006 |
 | `promax_8b` | 160.000 |
-
-Tokenizer memakai `min_frequency=1` untuk vocab ≥ 96k agar lebih banyak token unik dari corpus KBBI.
-
-Dataset seed dasar ~4.000+ pasangan (`generate_seed_data` + `seed_extra`); saat training ditambah **~8.000–12.000** pasangan KBBI/leksikon tergantung profil.
 
 ---
 
-## Training & chat: apa yang wajar diharapkan
+## Training & Chat: Apa yang Wajar Diharapkan
 
 ### Training
-
 - **Epoch 1** hampir selalu menghasilkan `val_loss` tinggi (6–8+ pada ProMax). Itu normal; model baru belajar distribusi token.
-- **Early stopping** (default): berhenti jika val loss tidak membaik beberapa epoch berturut-turut. Gunakan `--force` agar **semua** epoch di `--epochs` / default ProMax (≥30) tetap jalan.
-- Batch besar menstabilkan gradien, tetapi **tidak** menggantikan epoch yang cukup.
+- **Early stopping** (default): berhenti jika val loss tidak membaik beberapa epoch berturut-turut. Gunakan `--force` agar **semua** epoch di `--epochs` tetap jalan.
 
-### Chat terasa "template"
-
+### Chat Terasa "Template"
 Penyebab umum:
-
-1. Baru **1 epoch** — otak belum cukup; lanjutkan sampai `val_loss` turun (target nyaman ~4, ideal ~3.5).
-2. Checkpoint tier beda dengan yang dilatih — load `model_best.pt` yang cocok dengan `--promax-tier` saat chat.
-3. Output model ditolak validator → sekarang chat mencoba 3 tingkat (ketat → longgar → draft) sebelum fallback; setelah epoch sedikit, Anda akan melihat teks dari model meski masih kaku.
+1. Baru **1 epoch** — lanjutkan sampai `val_loss` turun (target nyaman ~4, ideal ~3.5).
+2. Checkpoint tier beda dengan yang dilatih.
+3. Output model ditolak validator → sekarang validator dicoba dalam 3 tingkat (ketat → longgar → draft).
 
 | val_loss (di checkpoint) | Perilaku |
 |--------------------------|----------|
 | ≤ 3.5 | Generasi model prioritas, validator ketat |
 | 3.5 – 5.5 | Model + validator longgar |
-| 5.5 – 7.5 | Model + validator draft (teks mentah lebih sering lolos) |
-| > 7.5 | Tetap dicoba dengan validator draft; fallback jika gagal |
-
-File yang dimuat chat: `data/checkpoints/model_best.pt`.
+| 5.5 – 7.5 | Model + validator draft |
+| > 7.5 | Tetap dicoba, backup fallback jika gagal |
 
 ---
 
-## Variabel lingkungan
+## Variabel Lingkungan
 
 | Variabel | Fungsi |
 |----------|--------|
@@ -506,69 +449,21 @@ File yang dimuat chat: `data/checkpoints/model_best.pt`.
 
 ---
 
-## Masalah umum
+## Masalah Umum & Solusi
 
 ### `ModuleNotFoundError: No module named 'ddgs'`
-
 ```bash
 pip install "ddgs>=9.14.0"
 ```
 
-Pastikan venv aktif: `which python` → path ke `.venv`.
-
-### Macet di `🏗️ Inisialisasi Model Transformer...` (Colab)
-
-Bukan error — PyTorch sedang **mengalokasikan bobot** (embedding + puluhan layer). Tidak ada progress bar, jadi terlihat hang.
-
-- **Jangan Ctrl+C** dulu; ProMax 1B di Colab T4 biasanya **1–5 menit** di baris itu.
-- Pastikan runtime **GPU**: menu *Runtime → Change runtime type → T4 GPU*.
-- Cek di notebook: `import torch; print(torch.cuda.is_available())` → harus `True`.
-- `promax_8b` di Colab T4: pakai `--force` (VRAM-fit otomatis); seq_len disesuaikan (~256–384). Untuk hasil lebih stabil, A100 40 GB+ lebih disarankan. Alternatif ringan:
-
-```bash
-!python main.py train --size promax --promax-tier promax_1b --epochs 30 --regen
-```
-
-Atau lebih ringan untuk uji cepat:
-
-```bash
-!python main.py train --size medium --epochs 20 --regen
-```
-
-### CUDA OOM
-
-- Turunkan tier: `--promax-tier promax_1b`
-- `--batch-size 1 --grad-accum 16` (atau lebih besar accum)
-- Profil lebih kecil: `--size large` atau `medium`
-
-### Training ProMax 8B berhenti sendiri di epoch kecil
-
-Tanpa `--force`, early stopping bisa menghentikan training. Jalankan:
-
-```bash
-python main.py train --size promax --promax-tier promax_8b --epochs 50 --force
-```
-
-### Chat selalu kalimat siap (fallback)
-
-- Lanjutkan training; cek `val_loss` di log training.
-- Pastikan `model_best.pt` ada.
-- Tier saat chat = tier saat train.
-
-### Checkpoint tidak cocok
-
-Hapus `data/checkpoints/*` dan latih ulang, atau `--regen` jika vocab berubah.
-
-### KBBI tidak terbaca / seed tidak bertambah
-
-- Sudah **ekstrak** `kbbi/ekstrak.zip`? Tanpa itu tidak ada `kbbi_v_part1.json`.
-- Pastikan `kbbi/kbbi_v_part1.json` ada: `ls kbbi/kbbi_v_part1.json`
-- Cek log training: harus muncul `Leksikon dimuat: … kata unik`.
-- Paksa sinkron seed: `SPACEAX_KBBI_SYNC=1 python main.py train --regen`.
+### Macet di `🏗️ Inisialisasi Model Transformer...`
+Bukan error — PyTorch sedang mengalokasikan bobot.
+- Jangan diganggu, biasanya memakan waktu **1-5 menit** untuk ProMax 1B di Colab T4.
+- Pastikan menggunakan Runtime GPU.
 
 ---
 
-## Kontak
+## Kontak & Kontributor
 
 **Thomas Alfareno Ananta Nugraha**  
 Teknik Informatika — FTEIC — ITS Surabaya  
