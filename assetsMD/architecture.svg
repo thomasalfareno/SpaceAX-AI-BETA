@@ -1,0 +1,205 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 500" width="100%" height="100%">
+  <defs>
+    <!-- Background Grid Pattern -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1f2937" stroke-width="1" stroke-opacity="0.5" />
+    </pattern>
+
+    <!-- Glowing Filters -->
+    <filter id="glow-central" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="10" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <filter id="glow-node" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="5" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+
+    <!-- Node Gradient Fills -->
+    <radialGradient id="center-grad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1e1b4b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </radialGradient>
+  </defs>
+
+  <style>
+    .bg-rect {
+      fill: #0b0f19;
+    }
+    .grid-rect {
+      fill: url(#grid);
+    }
+    .node-rect {
+      fill: #161b22;
+      stroke-width: 1.5;
+      rx: 8px;
+    }
+    .center-node {
+      fill: url(#center-grad);
+      stroke: #ff007f;
+      stroke-width: 2.5;
+      rx: 12px;
+      filter: url(#glow-central);
+    }
+    .label {
+      font-family: 'Inter', 'Segoe UI', sans-serif;
+      font-size: 13px;
+      fill: #c9d1d9;
+      font-weight: 500;
+      text-anchor: middle;
+    }
+    .center-label {
+      font-family: 'Outfit', 'Inter', sans-serif;
+      font-size: 18px;
+      fill: #ffffff;
+      font-weight: 800;
+      text-anchor: middle;
+      letter-spacing: 1.5px;
+    }
+    .sub-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 10px;
+      fill: #8b949e;
+      text-anchor: middle;
+    }
+    .flow-line {
+      fill: none;
+      stroke-width: 1.5;
+      stroke-dasharray: 6, 6;
+    }
+    /* Flow animation */
+    .flow-dots {
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+    }
+  </style>
+
+  <!-- Background -->
+  <rect width="850" height="500" class="bg-rect" />
+  <rect width="850" height="500" class="grid-rect" />
+
+  <!-- ================= CONNECTION LINES ================= -->
+  <!-- We'll draw lines from/to the central node (425, 250) -->
+  <!-- Top Left: Memory (180, 110) -->
+  <path id="line-memory" d="M 180 110 L 350 210" class="flow-line" stroke="#00f2fe" stroke-opacity="0.3" />
+  <!-- Top Right: Chat Engine (670, 110) -->
+  <path id="line-chat" d="M 670 110 L 500 210" class="flow-line" stroke="#bd93f9" stroke-opacity="0.3" />
+  <!-- Left: KBBI (140, 250) -->
+  <path id="line-kbbi" d="M 140 250 L 325 250" class="flow-line" stroke="#50fa7b" stroke-opacity="0.3" />
+  <!-- Right: Internet (710, 250) -->
+  <path id="line-internet" d="M 710 250 L 525 250" class="flow-line" stroke="#ffb86c" stroke-opacity="0.3" />
+  <!-- Bottom Left: Emotion (180, 390) -->
+  <path id="line-emotion" d="M 180 390 L 350 290" class="flow-line" stroke="#ff79c6" stroke-opacity="0.3" />
+  <!-- Bottom Right: Training (670, 390) -->
+  <path id="line-training" d="M 670 390 L 500 290" class="flow-line" stroke="#f1fa8c" stroke-opacity="0.3" />
+  <!-- Bottom Center: Tokenizer (425, 410) -->
+  <path id="line-tok" d="M 425 410 L 425 310" class="flow-line" stroke="#8be9fd" stroke-opacity="0.3" />
+
+  <!-- Animated flow particles moving along connection paths -->
+  <path d="M 180 110 L 350 210" class="flow-dots" stroke="#00f2fe" stroke-dasharray="0, 50" stroke-dashoffset="0">
+    <animate attributeName="stroke-dashoffset" values="0;100" dur="4s" repeatCount="indefinite" />
+  </path>
+  <path d="M 500 210 L 670 110" class="flow-dots" stroke="#bd93f9" stroke-dasharray="0, 50" stroke-dashoffset="0">
+    <animate attributeName="stroke-dashoffset" values="100;0" dur="4s" repeatCount="indefinite" />
+  </path>
+  <path d="M 140 250 L 325 250" class="flow-dots" stroke="#50fa7b" stroke-dasharray="0, 40" stroke-dashoffset="0">
+    <animate attributeName="stroke-dashoffset" values="0;80" dur="3s" repeatCount="indefinite" />
+  </path>
+  <path d="M 525 250 L 710 250" class="flow-dots" stroke="#ffb86c" stroke-dasharray="0, 40" stroke-dashoffset="0">
+    <animate attributeName="stroke-dashoffset" values="80;0" dur="3s" repeatCount="indefinite" />
+  </path>
+  <path d="M 180 390 L 350 290" class="flow-dots" stroke="#ff79c6" stroke-dasharray="0, 50" stroke-dashoffset="0">
+    <animate attributeName="stroke-dashoffset" values="0;100" dur="4s" repeatCount="indefinite" />
+  </path>
+  <path d="M 670 390 L 500 290" class="flow-dots" stroke="#f1fa8c" stroke-dasharray="0, 50" stroke-dashoffset="0">
+    <animate attributeName="stroke-dashoffset" values="100;0" dur="4s" repeatCount="indefinite" />
+  </path>
+  <path d="M 425 410 L 425 310" class="flow-dots" stroke="#8be9fd" stroke-dasharray="0, 30" stroke-dashoffset="0">
+    <animate attributeName="stroke-dashoffset" values="0;60" dur="2.5s" repeatCount="indefinite" />
+  </path>
+
+  <!-- ================= NODES ================= -->
+
+  <!-- CENTRAL NODE: SpaceAx Model -->
+  <g transform="translate(325, 210)">
+    <rect width="200" height="80" class="center-node">
+      <animate attributeName="stroke" values="#ff007f;#00f2fe;#ff007f" dur="6s" repeatCount="indefinite" />
+    </rect>
+    <text x="100" y="38" class="center-label">SpaceAx Model</text>
+    <text x="100" y="58" class="sub-label" fill="#00f2fe" font-weight="bold">Transformer Decoder + RoPE</text>
+  </g>
+
+  <!-- TOP LEFT: Memory -->
+  <g transform="translate(80, 70)">
+    <rect width="200" height="60" class="node-rect" stroke="#00f2fe">
+      <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite" />
+    </rect>
+    <text x="100" y="28" class="label">🧠 Memory Engine</text>
+    <text x="100" y="44" class="sub-label">STM Buffer + LTM SQLite</text>
+  </g>
+
+  <!-- TOP RIGHT: Chat Engine -->
+  <g transform="translate(570, 70)">
+    <rect width="200" height="60" class="node-rect" stroke="#bd93f9">
+      <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite" begin="0.5s" />
+    </rect>
+    <text x="100" y="28" class="label">💬 Chat Engine</text>
+    <text x="100" y="44" class="sub-label">Routing &amp; Multi-level Validator</text>
+  </g>
+
+  <!-- LEFT: KBBI Lexicon -->
+  <g transform="translate(20, 220)">
+    <rect width="180" height="60" class="node-rect" stroke="#50fa7b">
+      <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite" begin="1s" />
+    </rect>
+    <text x="90" y="28" class="label">📚 KBBI &amp; Lexicons</text>
+    <text x="90" y="44" class="sub-label">112k+ Entries + Gaul/Root</text>
+  </g>
+
+  <!-- RIGHT: Internet Search -->
+  <g transform="translate(650, 220)">
+    <rect width="180" height="60" class="node-rect" stroke="#ffb86c">
+      <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite" begin="1.5s" />
+    </rect>
+    <text x="90" y="28" class="label">🌐 Internet Search</text>
+    <text x="90" y="44" class="sub-label">DDGS Crawler &amp; Cache</text>
+  </g>
+
+  <!-- BOTTOM LEFT: Emotion Engine -->
+  <g transform="translate(80, 360)">
+    <rect width="200" height="60" class="node-rect" stroke="#ff79c6">
+      <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite" begin="2s" />
+    </rect>
+    <text x="100" y="28" class="label">🎭 Emotion Engine</text>
+    <text x="100" y="44" class="sub-label">9 Emotions + Tone Decay</text>
+  </g>
+
+  <!-- BOTTOM RIGHT: Training Pipeline -->
+  <g transform="translate(570, 360)">
+    <rect width="200" height="60" class="node-rect" stroke="#f1fa8c">
+      <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite" begin="2.5s" />
+    </rect>
+    <text x="100" y="28" class="label">📊 Training Pipeline</text>
+    <text x="100" y="44" class="sub-label">AdamW, AMP, Augmentation</text>
+  </g>
+
+  <!-- BOTTOM CENTER: BPE Tokenizer -->
+  <g transform="translate(325, 390)">
+    <rect width="200" height="50" class="node-rect" stroke="#8be9fd">
+      <animate attributeName="stroke-opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite" begin="1.2s" />
+    </rect>
+    <text x="100" y="22" class="label">🔤 BPE Tokenizer</text>
+    <text x="100" y="38" class="sub-label">Custom Vocab 72k - 160k</text>
+  </g>
+
+  <!-- Interactive Title -->
+  <text x="425" y="480" class="label" fill="#6272a4" font-size="12" letter-spacing="1">SPACEAX AI HYBRID-MODULAR ARCHITECTURE</text>
+</svg>

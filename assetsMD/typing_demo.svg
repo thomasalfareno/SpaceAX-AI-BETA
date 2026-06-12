@@ -1,0 +1,240 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 400" width="100%" height="100%">
+  <!-- Definitions -->
+  <defs>
+    <!-- Window Shadow Filter -->
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="115%">
+      <feDropShadow dx="0" dy="12" stdDeviation="15" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
+
+    <!-- Clip Paths for Typing Lines -->
+    <!-- Screen 1: Command 1 -->
+    <clipPath id="clip-cmd1">
+      <rect x="0" y="0" width="0" height="30">
+        <animate attributeName="width" values="0;450;450" keyTimes="0;0.8;1" dur="2.2s" begin="0.5s" repeatCount="indefinite" />
+      </rect>
+    </clipPath>
+
+    <!-- Screen 2: Command 2 -->
+    <clipPath id="clip-cmd2">
+      <rect x="0" y="0" width="0" height="30">
+        <animate attributeName="width" values="0;220;220" keyTimes="0;0.8;1" dur="1.5s" begin="9.0s" repeatCount="indefinite" />
+      </rect>
+    </clipPath>
+
+    <!-- Screen 2: User Input -->
+    <clipPath id="clip-user1">
+      <rect x="0" y="0" width="0" height="30">
+        <animate attributeName="width" values="0;250;250" keyTimes="0;0.8;1" dur="1.5s" begin="12.0s" repeatCount="indefinite" />
+      </rect>
+    </clipPath>
+
+    <!-- Screen 2: Bot Reply -->
+    <clipPath id="clip-bot1">
+      <rect x="0" y="0" width="0" height="100">
+        <animate attributeName="width" values="0;600;600" keyTimes="0;0.9;1" dur="2.5s" begin="14.2s" repeatCount="indefinite" />
+      </rect>
+    </clipPath>
+  </defs>
+
+  <style>
+    .terminal-window {
+      fill: #0d1117;
+      stroke: #30363d;
+      stroke-width: 1.5;
+      rx: 10px;
+    }
+    .title-bar {
+      fill: #161b22;
+      stroke: #30363d;
+      stroke-width: 1.5;
+    }
+    .window-title {
+      font-family: 'Fira Code', 'Courier New', monospace;
+      font-size: 13px;
+      fill: #8b949e;
+      font-weight: 500;
+    }
+    .term-text {
+      font-family: 'Fira Code', 'Courier New', monospace;
+      font-size: 14px;
+      fill: #c9d1d9;
+    }
+    .prompt {
+      fill: #58a6ff;
+      font-weight: bold;
+    }
+    .command {
+      fill: #50fa7b;
+    }
+    .output-info {
+      fill: #8b949e;
+    }
+    .output-success {
+      fill: #79c0ff;
+    }
+    .output-warning {
+      fill: #f1fa8c;
+    }
+    .bot-prompt {
+      fill: #ff79c6;
+      font-weight: bold;
+    }
+    .bot-reply {
+      fill: #8be9fd;
+    }
+    .cursor {
+      fill: #58a6ff;
+    }
+  </style>
+
+  <!-- Terminal Window Background with Shadow -->
+  <rect x="15" y="15" width="820" height="370" class="terminal-window" filter="url(#shadow)" />
+
+  <!-- Title Bar -->
+  <path d="M 15 25 A 10 10 0 0 1 25 15 L 825 15 A 10 10 0 0 1 835 25 L 835 50 L 15 50 Z" class="title-bar" />
+  
+  <!-- Window Control Buttons (macOS style) -->
+  <circle cx="40" cy="32" r="6" fill="#ff5f56" />
+  <circle cx="60" cy="32" r="6" fill="#ffbd2e" />
+  <circle cx="80" cy="32" r="6" fill="#27c93f" />
+
+  <!-- Window Title -->
+  <text x="425" y="36" text-anchor="middle" class="window-title">SpaceAx AI v2.0.0 — Terminal</text>
+
+  <!-- ================= SCREEN 1: TRAINING PANEL ================= -->
+  <g class="term-text">
+    <animate attributeName="opacity" values="1;1;0;0;1" keyTimes="0;0.43;0.46;0.97;1" dur="18s" repeatCount="indefinite" />
+    
+    <!-- Command Line -->
+    <g transform="translate(40, 85)">
+      <text x="0" y="0"><tspan class="prompt">gracecia@spaceax:~$ </tspan></text>
+      <!-- Typed text clip -->
+      <g clip-path="url(#clip-cmd1)">
+        <text x="180" y="0" class="command">python main.py train --size promax --epochs 30</text>
+      </g>
+      <!-- Blinking Cursor -->
+      <rect class="cursor" x="180" y="-12" width="8" height="15">
+        <animate attributeName="x" values="180;600;600" keyTimes="0;0.8;1" dur="2.2s" begin="0.5s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite" />
+        <!-- Hide when training output starts -->
+        <animate attributeName="visibility" to="hidden" begin="2.7s" dur="18s" repeatCount="indefinite" />
+      </rect>
+    </g>
+
+    <!-- Training Outputs (staggered delay) -->
+    <!-- Line 2: KBBI load -->
+    <g transform="translate(40, 115)">
+      <text x="0" y="0">🚀 Memuat leksikon KBBI...</text>
+      <animate attributeName="visibility" from="hidden" to="visible" begin="3.0s" dur="18s" repeatCount="indefinite" />
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="3.0s" repeatCount="indefinite" fill="freeze" />
+    </g>
+
+    <!-- Line 3: KBBI loaded success -->
+    <g transform="translate(40, 145)">
+      <text x="0" y="0" class="output-success">📚 Leksikon dimuat: 112,847 kata unik</text>
+      <animate attributeName="visibility" from="hidden" to="visible" begin="3.8s" dur="18s" repeatCount="indefinite" />
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="3.8s" repeatCount="indefinite" fill="freeze" />
+    </g>
+
+    <!-- Line 4: Model Initialization -->
+    <g transform="translate(40, 175)">
+      <text x="0" y="0">🏗️ Inisialisasi Model Transformer...</text>
+      <animate attributeName="visibility" from="hidden" to="visible" begin="4.6s" dur="18s" repeatCount="indefinite" />
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="4.6s" repeatCount="indefinite" fill="freeze" />
+    </g>
+
+    <!-- Line 5: ProMax Tier Info -->
+    <g transform="translate(40, 205)">
+      <text x="0" y="0" class="output-warning">⚡ ProMax 1B — 1.2B parameters (RAM: 48GB, VRAM: 16GB)</text>
+      <animate attributeName="visibility" from="hidden" to="visible" begin="5.5s" dur="18s" repeatCount="indefinite" />
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="5.5s" repeatCount="indefinite" fill="freeze" />
+    </g>
+
+    <!-- Line 6: Epoch Progress -->
+    <g transform="translate(40, 245)">
+      <text x="0" y="0">🎯 Training epoch 1/30</text>
+      <animate attributeName="visibility" from="hidden" to="visible" begin="6.3s" dur="18s" repeatCount="indefinite" />
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="6.3s" repeatCount="indefinite" fill="freeze" />
+    </g>
+
+    <!-- Progress bar & loss -->
+    <g transform="translate(40, 275)">
+      <!-- Progress Bar Track -->
+      <rect x="0" y="-12" width="200" height="14" fill="#161b22" stroke="#30363d" rx="3" />
+      <!-- Progress Bar Fill -->
+      <rect x="1" y="-11" width="0" height="12" fill="#28a745" rx="2">
+        <animate attributeName="width" values="0;160;160" keyTimes="0;0.9;1" dur="1.5s" begin="6.5s" repeatCount="indefinite" fill="freeze" />
+      </rect>
+      <!-- Percentage Text -->
+      <text x="215" y="0" class="output-success">80%</text>
+      <!-- Loss Info -->
+      <text x="260" y="0" class="output-info">loss: 4.872  val_loss: 5.120  (ETA: 04:12)</text>
+      
+      <animate attributeName="visibility" from="hidden" to="visible" begin="6.5s" dur="18s" repeatCount="indefinite" />
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="6.5s" repeatCount="indefinite" fill="freeze" />
+    </g>
+  </g>
+
+
+  <!-- ================= SCREEN 2: CHAT PANEL ================= -->
+  <g class="term-text" opacity="0">
+    <animate attributeName="opacity" values="0;0;1;1;0" keyTimes="0;0.45;0.48;0.95;0.98" dur="18s" repeatCount="indefinite" />
+
+    <!-- Chat Start Line command -->
+    <g transform="translate(40, 85)">
+      <text x="0" y="0"><tspan class="prompt">gracecia@spaceax:~$ </tspan></text>
+      <!-- Typed command -->
+      <g clip-path="url(#clip-cmd2)">
+        <text x="180" y="0" class="command">python main.py chat</text>
+      </g>
+      <!-- Blinking Cursor -->
+      <rect class="cursor" x="180" y="-12" width="8" height="15">
+        <animate attributeName="x" values="180;340;340" keyTimes="0;0.8;1" dur="1.5s" begin="9.0s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite" />
+        <!-- Hide cursor after command types -->
+        <animate attributeName="visibility" to="hidden" begin="10.8s" dur="18s" repeatCount="indefinite" />
+      </rect>
+    </g>
+
+    <!-- Bot Greeting -->
+    <g transform="translate(40, 120)">
+      <text x="0" y="0"><tspan class="bot-prompt">SpaceAx> </tspan>Halo! Ada yang bisa saya bantu? 🤖</text>
+      <animate attributeName="visibility" from="hidden" to="visible" begin="11.2s" dur="18s" repeatCount="indefinite" />
+      <animate attributeName="opacity" from="0" to="1" dur="0.2s" begin="11.2s" repeatCount="indefinite" fill="freeze" />
+    </g>
+
+    <!-- User Input Line -->
+    <g transform="translate(40, 160)">
+      <text x="0" y="0"><tspan class="prompt">User> </tspan></text>
+      <g clip-path="url(#clip-user1)">
+        <text x="55" y="0">Apa itu transformer?</text>
+      </g>
+      <!-- Blinking Cursor -->
+      <rect class="cursor" x="55" y="-12" width="8" height="15">
+        <animate attributeName="x" values="55;230;230" keyTimes="0;0.8;1" dur="1.5s" begin="12.0s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite" />
+        <!-- Hide cursor after input types -->
+        <animate attributeName="visibility" to="hidden" begin="13.8s" dur="18s" repeatCount="indefinite" />
+      </rect>
+      <animate attributeName="visibility" from="hidden" to="visible" begin="11.8s" dur="18s" repeatCount="indefinite" />
+    </g>
+
+    <!-- Bot Response typing -->
+    <g transform="translate(40, 200)">
+      <text x="0" y="0"><tspan class="bot-prompt">SpaceAx> </tspan></text>
+      <g clip-path="url(#clip-bot1)">
+        <!-- Multi-line AI response -->
+        <text x="85" y="0" class="bot-reply">Transformer adalah arsitektur neural network berbasis</text>
+        <text x="85" y="25" class="bot-reply">self-attention mechanism yang memproses seluruh token</text>
+        <text x="85" y="50" class="bot-reply">secara paralel, menggantikan RNN untuk pemodelan bahasa.</text>
+      </g>
+      <!-- Blinking Cursor -->
+      <rect class="cursor" x="85" y="38" width="8" height="15">
+        <animate attributeName="x" values="85;550;550" keyTimes="0;0.9;1" dur="2.5s" begin="14.2s" repeatCount="indefinite" />
+        <animate attributeName="y" values="-12;13;38;38" keyTimes="0;0.33;0.66;1" dur="2.5s" begin="14.2s" repeatCount="indefinite" />
+        <animate attributeName="opacity" values="1;0;1" dur="0.8s" repeatCount="indefinite" />
+      </rect>
+      <animate attributeName="visibility" from="hidden" to="visible" begin="14.0s" dur="18s" repeatCount="indefinite" />
+    </g>
+  </g>
+</svg>

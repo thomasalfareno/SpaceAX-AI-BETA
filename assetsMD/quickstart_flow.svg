@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 180" width="850" height="180">
+  <defs>
+    <!-- Arrowhead marker -->
+    <marker id="ah" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <path d="M0,0 L8,3 L0,6" fill="#8b949e" stroke="none"/>
+    </marker>
+    <!-- Glowing dot gradient -->
+    <radialGradient id="glow">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="1"/>
+      <stop offset="40%" stop-color="#58a6ff" stop-opacity="0.8"/>
+      <stop offset="100%" stop-color="#58a6ff" stop-opacity="0"/>
+    </radialGradient>
+    <!-- Step accent filters for glow effect -->
+    <filter id="gs1" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <style>
+    .label { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; font-size: 11px; fill: #c9d1d9; text-anchor: middle; }
+    .emoji { font-size: 22px; text-anchor: middle; dominant-baseline: central; }
+    .step-group { opacity: 0; }
+    .arrow-line { stroke: #8b949e; stroke-width: 1.5; fill: none; marker-end: url(#ah); }
+  </style>
+
+  <!-- Background -->
+  <rect width="850" height="180" rx="12" fill="#0d1117"/>
+  <!-- Subtle top border -->
+  <rect width="850" height="1" fill="url(#glow)" opacity="0.15"/>
+
+  <!-- ==================== STEP 1: Clone (cyan #22d3ee) ==================== -->
+  <g class="step-group" id="s1">
+    <rect x="42" y="35" width="72" height="72" rx="18" fill="none" stroke="#22d3ee" stroke-width="2" opacity="0.25"/>
+    <rect x="42" y="35" width="72" height="72" rx="18" fill="#22d3ee" opacity="0.08"/>
+    <text x="78" y="73" class="emoji">📥</text>
+    <text x="78" y="128" class="label" fill="#22d3ee" font-weight="600">Clone</text>
+    <text x="78" y="145" class="label" opacity="0.5" font-size="9">Step 1</text>
+    <!-- Fade in + scale -->
+    <animateTransform attributeName="transform" type="translate" from="0 10" to="0 0" dur="0.5s" begin="0.3s" fill="freeze"/>
+    <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="0.3s" fill="freeze"/>
+  </g>
+
+  <!-- Arrow 1→2 -->
+  <line x1="122" y1="71" x2="195" y2="71" class="arrow-line" stroke-dasharray="73" stroke-dashoffset="73" id="a1">
+    <animate attributeName="stroke-dashoffset" from="73" to="0" dur="0.4s" begin="0.8s" fill="freeze"/>
+  </line>
+
+  <!-- ==================== STEP 2: Extract KBBI (green #4ade80) ==================== -->
+  <g class="step-group" id="s2">
+    <rect x="203" y="35" width="72" height="72" rx="18" fill="none" stroke="#4ade80" stroke-width="2" opacity="0.25"/>
+    <rect x="203" y="35" width="72" height="72" rx="18" fill="#4ade80" opacity="0.08"/>
+    <text x="239" y="68" class="emoji">📦</text>
+    <text x="239" y="128" class="label" fill="#4ade80" font-weight="600">Extract</text>
+    <text x="239" y="145" class="label" opacity="0.5" font-size="9">Step 2</text>
+    <animateTransform attributeName="transform" type="translate" from="0 10" to="0 0" dur="0.5s" begin="1.2s" fill="freeze"/>
+    <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="1.2s" fill="freeze"/>
+  </g>
+
+  <!-- Arrow 2→3 -->
+  <line x1="283" y1="71" x2="356" y2="71" class="arrow-line" stroke-dasharray="73" stroke-dashoffset="73" id="a2">
+    <animate attributeName="stroke-dashoffset" from="73" to="0" dur="0.4s" begin="1.7s" fill="freeze"/>
+  </line>
+
+  <!-- ==================== STEP 3: Install (orange #fb923c) ==================== -->
+  <g class="step-group" id="s3">
+    <rect x="364" y="35" width="72" height="72" rx="18" fill="none" stroke="#fb923c" stroke-width="2" opacity="0.25"/>
+    <rect x="364" y="35" width="72" height="72" rx="18" fill="#fb923c" opacity="0.08"/>
+    <text x="400" y="73" class="emoji">⚙️</text>
+    <text x="400" y="128" class="label" fill="#fb923c" font-weight="600">Install</text>
+    <text x="400" y="145" class="label" opacity="0.5" font-size="9">Step 3</text>
+    <animateTransform attributeName="transform" type="translate" from="0 10" to="0 0" dur="0.5s" begin="2.1s" fill="freeze"/>
+    <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="2.1s" fill="freeze"/>
+  </g>
+
+  <!-- Arrow 3→4 -->
+  <line x1="444" y1="71" x2="517" y2="71" class="arrow-line" stroke-dasharray="73" stroke-dashoffset="73" id="a3">
+    <animate attributeName="stroke-dashoffset" from="73" to="0" dur="0.4s" begin="2.6s" fill="freeze"/>
+  </line>
+
+  <!-- ==================== STEP 4: Train (purple #c084fc) ==================== -->
+  <g class="step-group" id="s4">
+    <rect x="525" y="35" width="72" height="72" rx="18" fill="none" stroke="#c084fc" stroke-width="2" opacity="0.25"/>
+    <rect x="525" y="35" width="72" height="72" rx="18" fill="#c084fc" opacity="0.08"/>
+    <text x="561" y="73" class="emoji">🚀</text>
+    <text x="561" y="128" class="label" fill="#c084fc" font-weight="600">Train</text>
+    <text x="561" y="145" class="label" opacity="0.5" font-size="9">Step 4</text>
+    <animateTransform attributeName="transform" type="translate" from="0 10" to="0 0" dur="0.5s" begin="3.0s" fill="freeze"/>
+    <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="3.0s" fill="freeze"/>
+  </g>
+
+  <!-- Arrow 4→5 -->
+  <line x1="605" y1="71" x2="678" y2="71" class="arrow-line" stroke-dasharray="73" stroke-dashoffset="73" id="a4">
+    <animate attributeName="stroke-dashoffset" from="73" to="0" dur="0.4s" begin="3.5s" fill="freeze"/>
+  </line>
+
+  <!-- ==================== STEP 5: Chat (pink #f472b6) ==================== -->
+  <g class="step-group" id="s5">
+    <rect x="686" y="35" width="72" height="72" rx="18" fill="none" stroke="#f472b6" stroke-width="2" opacity="0.25"/>
+    <rect x="686" y="35" width="72" height="72" rx="18" fill="#f472b6" opacity="0.08"/>
+    <text x="722" y="73" class="emoji">💬</text>
+    <text x="722" y="128" class="label" fill="#f472b6" font-weight="600">Chat</text>
+    <text x="722" y="145" class="label" opacity="0.5" font-size="9">Step 5</text>
+    <animateTransform attributeName="transform" type="translate" from="0 10" to="0 0" dur="0.5s" begin="3.9s" fill="freeze"/>
+    <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="3.9s" fill="freeze"/>
+  </g>
+
+  <!-- ==================== TRAVELING DOT ==================== -->
+  <!-- The dot travels along the path from step 1 center to step 5 center -->
+  <circle r="5" fill="url(#glow)" opacity="0" filter="url(#gs1)">
+    <!-- Show dot after intro animations finish -->
+    <animate attributeName="opacity" values="0;0;1;1;1;0" keyTimes="0;0.02;0.06;0.85;0.92;1" dur="3s" begin="4.8s" repeatCount="indefinite"/>
+    <!-- Travel horizontally -->
+    <animate attributeName="cx" values="78;239;239;400;400;561;561;722" keyTimes="0;0.2;0.25;0.45;0.5;0.7;0.75;0.95" dur="3s" begin="4.8s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="71;71;71;71;71;71;71;71" dur="3s" begin="4.8s" repeatCount="indefinite"/>
+    <!-- Pulse size -->
+    <animate attributeName="r" values="4;6;4;6;4;6;4;6" dur="3s" begin="4.8s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- Secondary trail glow (smaller, follows behind) -->
+  <circle r="3" fill="#58a6ff" opacity="0">
+    <animate attributeName="opacity" values="0;0;0.5;0.5;0.5;0" keyTimes="0;0.04;0.08;0.82;0.90;1" dur="3s" begin="4.9s" repeatCount="indefinite"/>
+    <animate attributeName="cx" values="78;239;239;400;400;561;561;722" keyTimes="0;0.2;0.25;0.45;0.5;0.7;0.75;0.95" dur="3s" begin="4.9s" repeatCount="indefinite"/>
+    <animate attributeName="cy" values="71;71;71;71;71;71;71;71" dur="3s" begin="4.9s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- ==================== Step highlight pulse as dot arrives ==================== -->
+  <!-- Step 1 pulse -->
+  <rect x="42" y="35" width="72" height="72" rx="18" fill="none" stroke="#22d3ee" stroke-width="2" opacity="0">
+    <animate attributeName="opacity" values="0;0.6;0" dur="0.5s" begin="4.8s" repeatCount="indefinite"/>
+    <animate attributeName="stroke-width" values="2;4;2" dur="0.5s" begin="4.8s" repeatCount="indefinite"/>
+  </rect>
+  <!-- Step 2 pulse -->
+  <rect x="203" y="35" width="72" height="72" rx="18" fill="none" stroke="#4ade80" stroke-width="2" opacity="0">
+    <animate attributeName="opacity" values="0;0.6;0" dur="0.5s" begin="5.4s" repeatCount="indefinite"/>
+    <animate attributeName="stroke-width" values="2;4;2" dur="0.5s" begin="5.4s" repeatCount="indefinite"/>
+  </rect>
+  <!-- Step 3 pulse -->
+  <rect x="364" y="35" width="72" height="72" rx="18" fill="none" stroke="#fb923c" stroke-width="2" opacity="0">
+    <animate attributeName="opacity" values="0;0.6;0" dur="0.5s" begin="6.15s" repeatCount="indefinite"/>
+    <animate attributeName="stroke-width" values="2;4;2" dur="0.5s" begin="6.15s" repeatCount="indefinite"/>
+  </rect>
+  <!-- Step 4 pulse -->
+  <rect x="525" y="35" width="72" height="72" rx="18" fill="none" stroke="#c084fc" stroke-width="2" opacity="0">
+    <animate attributeName="opacity" values="0;0.6;0" dur="0.5s" begin="6.9s" repeatCount="indefinite"/>
+    <animate attributeName="stroke-width" values="2;4;2" dur="0.5s" begin="6.9s" repeatCount="indefinite"/>
+  </rect>
+  <!-- Step 5 pulse -->
+  <rect x="686" y="35" width="72" height="72" rx="18" fill="none" stroke="#f472b6" stroke-width="2" opacity="0">
+    <animate attributeName="opacity" values="0;0.6;0" dur="0.5s" begin="7.65s" repeatCount="indefinite"/>
+    <animate attributeName="stroke-width" values="2;4;2" dur="0.5s" begin="7.65s" repeatCount="indefinite"/>
+  </rect>
+
+  <!-- Title -->
+  <text x="425" y="172" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="10" fill="#484f58" opacity="0">
+    Quickstart Workflow
+    <animate attributeName="opacity" from="0" to="0.6" dur="0.8s" begin="4.5s" fill="freeze"/>
+  </text>
+</svg>
