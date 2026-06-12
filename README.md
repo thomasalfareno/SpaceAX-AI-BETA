@@ -12,18 +12,19 @@ Mesin percakapan Bahasa Indonesia berbasis **Transformer decoder-only**, dilatih
 ## Daftar Isi
 
 1. [Gambaran Singkat](#gambaran-singkat)
-2. [Folder `kbbi/` & Sinkron Leksikon](#folder-kbbi--sinkron-leksikon)
-3. [Struktur Folder & Modul](#struktur-folder--modul)
-4. [Persyaratan Sistem](#persyaratan-sistem)
-5. [Instalasi Windows](#instalasi-windows)
-6. [Instalasi Linux](#instalasi-linux)
-7. [Google Colab](#google-colab)
-8. [Perintah CLI](#perintah-cli)
-9. [ProMax 1B / 4B / 8B](#promax-1b--4b--8b)
-10. [Ukuran Vocab Per Profil](#ukuran-vocab-per-profil)
-11. [Training & Chat: Apa yang Wajar Diharapkan](#training--chat-apa-yang-wajar-diharapkan)
-12. [Variabel Lingkungan](#variabel-lingkungan)
-13. [Masalah Umum & Solusi](#masalah-umum)
+2. [Arsitektur & Alur Sistem (Animated)](#arsitektur--alur-sistem-animated)
+3. [Folder `kbbi/` & Sinkron Leksikon](#folder-kbbi--sinkron-leksikon)
+4. [Struktur Folder & Modul](#struktur-folder--modul)
+5. [Persyaratan Sistem](#persyaratan-sistem)
+6. [Instalasi Windows](#instalasi-windows)
+7. [Instalasi Linux](#instalasi-linux)
+8. [Google Colab](#google-colab)
+9. [Perintah CLI](#perintah-cli)
+10. [ProMax 1B / 4B / 8B](#promax-1b--4b--8b)
+11. [Ukuran Vocab Per Profil](#ukuran-vocab-per-profil)
+12. [Training & Chat: Apa yang Wajar Diharapkan](#training--chat-apa-yang-wajar-diharapkan)
+13. [Variabel Lingkungan](#variabel-lingkungan)
+14. [Masalah Umum & Solusi](#masalah-umum)
 
 ---
 
@@ -45,6 +46,27 @@ Alur kerja biasa:
 5. (Opsional) `python main.py retrain` — gabung log chat ke dataset lalu latih ulang.
 
 **Fitur Utama:** memori percakapan (STM/LTM), mesin emosi, **KBBI + leksikon lengkap** (slang, daftar kata, kata dasar), pencarian internet (`ddgs`), augmentasi anti-hafalan, skala **ProMax** (~1.2B / ~4B / ~8B parameter), flag **`--force`** untuk training tanpa early stopping.
+
+---
+
+## Arsitektur & Alur Sistem (Animated)
+
+Berikut adalah visualisasi alur pemrosesan token dan routing kueri yang terintegrasi di dalam **SpaceAx AI CLI & Core Model**:
+
+![SpaceAx AI Architecture Map](assetsMD/architecture.svg)
+
+### Penjelasan Komponen Alur Kerja:
+1. **Leksikon Preprocess (Pre-processing Engine):** Menerjemahkan bahasa gaul / tidak baku (*slang*) ke padanan kata baku yang terdaftar pada leksikon KBBI (`combined_slang_words.txt`). Contoh: `"gw mager bgt"` ➔ `"saya malas bergerak sangat"`.
+2. **SpaceAx Model (Transformer Core):** Model decoder-only teroptimasi menggunakan RoPE (Rotary Position Embeddings) untuk mengalokasikan relasi token secara sirkular. Tingkatan ProMax mengemas parameter dari 1B hingga 8B.
+3. **Core Controller (Memory & Emotion Engine):** STM memproses dynamic context window 5 giliran terakhir, sedangkan LTM (SQLite DB) menyimpan fakta-fakta penting. Mesin emosi memodifikasi representasi mood jawaban di output.
+4. **Validator 3-Tingkat (Anti-Gibberish System):** Mencegah keluaran acak / cacat dari model baru (pada loss tinggi) dengan memverifikasi rasio vokal, leksikon KBBI, serta keselarasan kalimat. Jika gagal, memicu *fallback* pencarian web (`ddgs` / DuckDuckGo Search) untuk melengkapi pengetahuan model secara real-time.
+
+### Visualisasi Detail Mekanisme RoPE & Atensi Kausal:
+
+![SpaceAx RoPE Attention Diagram](assetsMD/transformer_rope.svg)
+
+*   **Rotary Position Embedding (RoPE):** Menggunakan rotasi spasial 2 dimensi kompleks beraturan pada vektor query $q_m$ dan key $k_n$ berdasarkan posisi relatif $m-n$. Ini menghindari batasan posisi absolut tradisional dan mempertahankan pemahaman rentang context-window yang dinamis.
+*   **Masked Causal Self-Attention:** Untuk model bertipe auto-regresif decoder-only, proses atensi mencegah bocornya informasi dari token masa depan dengan mengalikan elemen segitiga atas attention matrix dengan $-\infty$ sebelum fungsi softmax.
 
 ---
 
